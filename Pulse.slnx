@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Pulse.Web/Pulse.Web.csproj" />
+  </Folder>
+</Solution>
