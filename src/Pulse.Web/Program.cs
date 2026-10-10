@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Pulse.Web.Components;
 using Pulse.Web.Data;
+using Pulse.Web.Identity;
 using Pulse.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -18,6 +19,25 @@ builder.Services.AddDbContextFactory<PulseDbContext>(options => options.UseSqlit
 builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 builder.Services.AddScoped<EventStore>();
 
+builder.Services
+    .AddAuthentication(ParticipantIdentityMiddleware.Scheme)
+    .AddCookie(ParticipantIdentityMiddleware.Scheme, options =>
+    {
+        options.Cookie.Name = "Pulse.Participant";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+
+        options.Cookie.SecurePolicy =
+            builder.Environment.IsDevelopment()
+                ? CookieSecurePolicy.SameAsRequest
+                : CookieSecurePolicy.Always;
+
+        options.ExpireTimeSpan = TimeSpan.FromDays(180);
+        options.SlidingExpiration = false;
+    });
+
+builder.Services.AddAuthorization();
+builder.Services.AddCascadingAuthenticationState();
 
 var app = builder.Build();
 
@@ -31,6 +51,9 @@ if (!app.Environment.IsDevelopment())
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
+app.UseMiddleware<ParticipantIdentityMiddleware>();
+app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
