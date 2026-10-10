@@ -33,7 +33,12 @@ else
            readonly
            value="@Navigation.ToAbsoluteUri($"questions/{Id}")" />
 
-    <VoteForm QuestionId="@Id" @key="Id" />
+    <VoteForm QuestionId="@Id"
+              @key="Id"
+              OnSaved="RefreshResults" />
+
+    <ResultPanel QuestionId="@Id"
+                 Revision="@_resultRevision" />
 }
 
 @code {
@@ -43,6 +48,7 @@ else
     private QuestionDetails? _question;
     private string? _error;
     private bool _loading = true;
+    private int _resultRevision;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -63,5 +69,10 @@ else
         {
             _loading = false;
         }
+    }
+
+    private void RefreshResults()
+    {
+        _resultRevision++;
     }
 }

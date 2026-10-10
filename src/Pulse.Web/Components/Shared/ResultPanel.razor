@@ -1,0 +1,91 @@
+﻿@using System.Globalization
+@using Pulse.Web.Domain
+@using Pulse.Web.Services
+@inject ResultService Results
+@inject ILogger<ResultPanel> Logger
+
+<h2>Current result</h2>
+
+@if (_error is not null)
+{
+    <p role="alert">@_error</p>
+}
+else if (_result is null)
+{
+    <p>Loading results…</p>
+}
+else if (_result.ParticipantCount == 0)
+{
+    <p>No votes yet.</p>
+}
+else
+{
+    <p>Participants: @_result.ParticipantCount</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Answer</th>
+                <th>People</th>
+                <th>Share (%)</th>
+                <th>Average confidence</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in _result.Answers)
+            {
+                <tr>
+                    <td>@row.Answer</td>
+                    <td>@row.Count</td>
+                    <td>@Format(row.Percentage)</td>
+                    <td>@Format(row.AverageConfidence)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <p>
+        Changed their answer:
+        @_result.ChangedAnswerCount
+        (@Format(_result.ChangedAnswerPercentage)%)
+    </p>
+
+    <p>Each participant counts equally. Confidence is self-reported.</p>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public Guid QuestionId { get; set; }
+
+    [Parameter]
+    public int Revision { get; set; }
+
+    private ResultSnapshot? _result;
+    private string? _error;
+    private int _loadVersion;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var version = ++_loadVersion;
+        _result = null;
+        _error = null;
+
+        try
+        {
+            var result = await Results.GetCurrentAsync(QuestionId);
+
+            if (version == _loadVersion)
+                _result = result;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not load results.");
+
+            if (version == _loadVersion)
+                _error = "Could not load results. Please reload the page.";
+        }
+    }
+
+    private static string Format(decimal? value) =>
+        value?.ToString("0.0", CultureInfo.InvariantCulture) ?? "—";
+}

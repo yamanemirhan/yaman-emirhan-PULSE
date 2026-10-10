@@ -49,6 +49,9 @@
     [Parameter, EditorRequired]
     public Guid QuestionId { get; set; }
 
+    [Parameter]
+    public EventCallback OnSaved { get; set; }
+
     private VoteAnswer _answer = VoteAnswer.Unsure;
     private int _confidence = 50;
     private VoteCastPayload? _saved;
@@ -119,6 +122,8 @@
 
             // The operation succeeded. A later submission is a new operation.
             _attemptKey = null;
+
+            await OnSaved.InvokeAsync();
         }
         catch (ValidationException ex)
         {
