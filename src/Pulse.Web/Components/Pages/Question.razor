@@ -1,8 +1,10 @@
 ﻿@page "/questions/{Id:guid}"
-@using Pulse.Web.Services
+@rendermode InteractiveServer
 @inject QuestionService Questions
 @inject NavigationManager Navigation
 @inject ILogger<Question> Logger
+@using Pulse.Web.Services
+@using Pulse.Web.Components.Shared
 
 <PageTitle>PULSE question</PageTitle>
 
@@ -31,7 +33,7 @@ else
            readonly
            value="@Navigation.ToAbsoluteUri($"questions/{Id}")" />
 
-    <p>Voting is coming next.</p>
+    <VoteForm QuestionId="@Id" @key="Id" />
 }
 
 @code {

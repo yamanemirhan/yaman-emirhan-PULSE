@@ -1,0 +1,141 @@
+﻿@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Authorization
+@using Pulse.Web.Domain
+@using Pulse.Web.Services
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject VoteService Votes
+@inject ILogger<VoteForm> Logger
+
+<h2>Your vote</h2>
+
+@if (_saved is not null)
+{
+    <p>Your saved answer: @_saved.Answer — confidence @_saved.Confidence/100</p>
+}
+
+<fieldset disabled="@(_busy || _loadFailed)">
+    <label for="vote-answer">Answer</label>
+    <select id="vote-answer" @bind="_answer">
+        <option value="@VoteAnswer.Yes">Yes</option>
+        <option value="@VoteAnswer.No">No</option>
+        <option value="@VoteAnswer.Unsure">Unsure</option>
+    </select>
+
+    <label for="vote-confidence">Confidence: @_confidence/100</label>
+    <input id="vote-confidence"
+           type="range"
+           min="0"
+           max="100"
+           step="1"
+           @bind="_confidence"
+           @bind:event="oninput" />
+
+    <button type="button" @onclick="SaveAsync">
+        @(_busy ? "Please wait…" : "Save vote")
+    </button>
+</fieldset>
+
+@if (_message is not null)
+{
+    <p role="status">@_message</p>
+}
+
+@if (_error is not null)
+{
+    <p role="alert">@_error</p>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public Guid QuestionId { get; set; }
+
+    private VoteAnswer _answer = VoteAnswer.Unsure;
+    private int _confidence = 50;
+    private VoteCastPayload? _saved;
+    private string? _attemptKey;
+    private Guid _requestId;
+    private string? _message;
+    private string? _error;
+    private bool _busy = true;
+    private bool _loadFailed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var state =
+                await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+            _saved = await Votes.GetLatestAsync(state.User, QuestionId);
+
+            if (_saved is not null)
+            {
+                _answer = _saved.Answer;
+                _confidence = _saved.Confidence;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not load participant vote.");
+            _error = "Could not load your vote. Please reload the page.";
+            _loadFailed = true;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_busy || _loadFailed)
+            return;
+
+        _busy = true;
+        _error = null;
+        _message = null;
+
+        var answer = _answer;
+        var confidence = _confidence;
+
+        try
+        {
+            var attemptKey = $"{QuestionId}:{answer}:{confidence}";
+
+            if (_attemptKey != attemptKey)
+            {
+                _attemptKey = attemptKey;
+                _requestId = Guid.NewGuid();
+            }
+
+            var state =
+                await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+            await Votes.CastAsync(
+                state.User, QuestionId, _requestId, answer, confidence);
+
+            _saved = new VoteCastPayload(answer, confidence);
+            _message = "Vote saved.";
+
+            // The operation succeeded. A later submission is a new operation.
+            _attemptKey = null;
+        }
+        catch (ValidationException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            _error = "Please reload the page to restore your identity.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Vote submission failed.");
+            _error = "Could not save your vote. Please try again.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}
