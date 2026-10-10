@@ -32,5 +32,36 @@ namespace Pulse.Web.Data
                 .IsUnique()
                 .HasFilter("\"Kind\" = 'QuestionCreated'");
         }
+
+        public override int SaveChanges(bool acceptAllChangesOnSuccess)
+        {
+            RejectHistoryChanges();
+
+            return base.SaveChanges(acceptAllChangesOnSuccess);
+        }
+
+        public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+        {
+            RejectHistoryChanges();
+
+            return base.SaveChangesAsync(
+                acceptAllChangesOnSuccess,
+                cancellationToken);
+        }
+
+        private void RejectHistoryChanges()
+        {
+            ChangeTracker.DetectChanges();
+
+            var historyChanged = ChangeTracker.Entries<PulseEvent>()
+                .Any(entry =>
+                    entry.State is EntityState.Modified or EntityState.Deleted);
+
+            if (historyChanged)
+            {
+                throw new InvalidOperationException(
+                    "History records cannot be modified or deleted.");
+            }
+        }
     }
 }
