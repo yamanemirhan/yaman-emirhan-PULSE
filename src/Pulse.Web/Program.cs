@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Pulse.Web.Components;
 using Pulse.Web.Data;
+using Pulse.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,7 +15,8 @@ Directory.CreateDirectory(dataDirectory);
 var databasePath = Path.Combine(dataDirectory, "pulse.db");
 builder.Services.AddDbContextFactory<PulseDbContext>(options => options.UseSqlite($"Data Source={databasePath}"));
 
-
+builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
+builder.Services.AddScoped<EventStore>();
 
 
 var app = builder.Build();
