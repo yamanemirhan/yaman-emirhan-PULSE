@@ -6,9 +6,11 @@ namespace Pulse.Web.Data
     public class PulseDbContext(DbContextOptions<PulseDbContext> options) : DbContext(options)
     {
         public DbSet<PulseEvent> Events => Set<PulseEvent>();
+        public DbSet<PresentedResult> PresentedResults => Set<PresentedResult>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            // Events
             var events = modelBuilder.Entity<PulseEvent>();
 
             events.HasKey(e => e.Sequence); // primary key
@@ -36,6 +38,24 @@ namespace Pulse.Web.Data
                 .HasConversion(
                     value => value,
                     value => DateTime.SpecifyKind(value, DateTimeKind.Utc));
+
+            //Results
+            var results = modelBuilder.Entity<PresentedResult>();
+
+            results.HasKey(r => r.Id);
+
+            // there can be only one result for a given question, sequence and algorithm version
+            results.HasIndex(r => new
+            {
+                r.QuestionId,
+                r.ThroughSequence,
+                r.AlgorithmVersion
+            }).IsUnique();
+
+            results.Property(r => r.ServedAtUtc)
+                .HasConversion(
+                    value => value,
+                    value => DateTime.SpecifyKind(value, DateTimeKind.Utc));
         }
 
         public override int SaveChanges(bool acceptAllChangesOnSuccess)
@@ -58,9 +78,12 @@ namespace Pulse.Web.Data
         {
             ChangeTracker.DetectChanges();
 
-            var historyChanged = ChangeTracker.Entries<PulseEvent>()
-                .Any(entry =>
-                    entry.State is EntityState.Modified or EntityState.Deleted);
+            //var historyChanged = ChangeTracker.Entries<PulseEvent>()
+            //    .Any(entry =>
+            //        entry.State is EntityState.Modified or EntityState.Deleted);
+            var historyChanged = ChangeTracker.Entries().Any(entry =>
+                (entry.Entity is PulseEvent or PresentedResult) &&
+                (entry.State is EntityState.Modified or EntityState.Deleted));
 
             if (historyChanged)
             {

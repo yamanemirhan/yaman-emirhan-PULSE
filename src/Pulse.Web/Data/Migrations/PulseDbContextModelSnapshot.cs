@@ -17,6 +17,37 @@ namespace Pulse.Web.Data.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
 
+            modelBuilder.Entity("Pulse.Web.Domain.PresentedResult", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AlgorithmVersion")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("QuestionId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ResultJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ServedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("ThroughSequence")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("QuestionId", "ThroughSequence", "AlgorithmVersion")
+                        .IsUnique();
+
+                    b.ToTable("PresentedResults");
+                });
+
             modelBuilder.Entity("Pulse.Web.Domain.PulseEvent", b =>
                 {
                     b.Property<long>("Sequence")
