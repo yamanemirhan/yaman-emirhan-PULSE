@@ -1,0 +1,98 @@
+﻿@using System.Text.Json
+@using Pulse.Web.Domain
+@using Pulse.Web.Services
+@inject ResultService Results
+@inject ILogger<ResultHistory> Logger
+
+<details>
+    <summary>Stored results and replay</summary>
+
+    <p>
+        Compare saved outputs with a fresh calculation
+        using their original event boundaries and versions.
+    </p>
+
+    <button type="button" @onclick="CompareAsync" disabled="@_busy">
+        @(_busy ? "Comparing…" : "Compare stored results")
+    </button>
+
+    @if (_error is not null)
+    {
+        <p role="alert">@_error</p>
+    }
+
+    @if (_comparisons is not null)
+    {
+        @if (_comparisons.Count == 0)
+        {
+            <p>No stored results yet.</p>
+        }
+
+        @foreach (var item in _comparisons)
+        {
+            <details @key="item.Id">
+                <summary>
+                    Through event @item.Stored.ThroughSequence
+                    · @item.Stored.AlgorithmVersion
+                    · @(item.Matches ? "Match" : "MISMATCH")
+                </summary>
+
+                <p>
+                    First prepared:
+                    @item.ServedAtUtc.ToString("yyyy-MM-dd HH:mm:ss") UTC
+                </p>
+
+                <h3>Stored output</h3>
+                <pre>@ToJson(item.Stored)</pre>
+
+                <h3>Replayed output</h3>
+                <pre>@ToJson(item.Replayed)</pre>
+            </details>
+        }
+
+        <p>Run the comparison again after new votes.</p>
+    }
+</details>
+
+@code {
+    [Parameter, EditorRequired]
+    public Guid QuestionId { get; set; }
+
+    private IReadOnlyList<ResultComparison>? _comparisons;
+    private bool _busy;
+    private string? _error;
+
+    private static readonly JsonSerializerOptions JsonOptions =
+        new() { WriteIndented = true };
+
+    private async Task CompareAsync()
+    {
+        if (_busy)
+            return;
+
+        _busy = true;
+        _error = null;
+        _comparisons = null;
+
+        try
+        {
+            _comparisons = await Results.CompareStoredAsync(QuestionId);
+        }
+        catch (NotSupportedException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Stored result comparison failed.");
+            _error = "Could not compare results. No records were changed.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string ToJson(ResultSnapshot result) =>
+        JsonSerializer.Serialize(result, JsonOptions);
+}

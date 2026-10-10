@@ -39,6 +39,9 @@ else
 
     <ResultPanel QuestionId="@Id"
                  Revision="@_resultRevision" />
+
+    <ResultHistory QuestionId="@Id"
+              @key="(Id, nameof(ResultHistory))" />
 }
 
 @code {

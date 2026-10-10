@@ -94,5 +94,64 @@ namespace Pulse.Web.Services
 
             return snapshot;
         }
+
+        public async Task<IReadOnlyList<ResultComparison>> CompareStoredAsync(Guid questionId)
+        {
+            await using var db = await dbFactory.CreateDbContextAsync();
+
+            // Retrieve all stored results for the question, ordered by sequence number
+            var storedResults = await db.PresentedResults
+                .AsNoTracking()
+                .Where(r => r.QuestionId == questionId)
+                .OrderBy(r => r.ThroughSequence)
+                .ToListAsync();
+
+            if (storedResults.Count == 0)
+                return Array.Empty<ResultComparison>();
+
+            // last boundary is the sequence number of the last stored result, which is used to limit the events retrieved for comparison
+            var lastBoundary = storedResults.Max(r => r.ThroughSequence);
+
+            var events = await db.Events
+                .AsNoTracking()
+                .Where(e =>
+                    e.QuestionId == questionId &&
+                    e.Sequence <= lastBoundary)
+                .OrderBy(e => e.Sequence)
+                .ToListAsync();
+
+            var comparisons = new List<ResultComparison>();
+
+            foreach (var record in storedResults)
+            {
+                var stored = ReadSnapshot(record);
+
+                var replayed = ResultCalculator.Calculate(
+                    questionId,
+                    events,
+                    record.ThroughSequence,
+                    record.AlgorithmVersion);
+
+                comparisons.Add(new ResultComparison(
+                    record.Id,
+                    record.ServedAtUtc,
+                    stored,
+                    replayed,
+                    SameResult(stored, replayed)));
+            }
+
+            return comparisons;
+        }
+
+        private static bool SameResult(ResultSnapshot first, ResultSnapshot second)
+        {
+            return first.QuestionId == second.QuestionId
+                && first.ThroughSequence == second.ThroughSequence
+                && first.AlgorithmVersion == second.AlgorithmVersion
+                && first.ParticipantCount == second.ParticipantCount
+                && first.ChangedAnswerCount == second.ChangedAnswerCount
+                && first.ChangedAnswerPercentage == second.ChangedAnswerPercentage
+                && first.Answers.SequenceEqual(second.Answers);
+        }
     }
 }
