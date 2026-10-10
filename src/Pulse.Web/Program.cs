@@ -39,6 +39,8 @@ builder.Services
 builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
 
+builder.Services.AddScoped<QuestionService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

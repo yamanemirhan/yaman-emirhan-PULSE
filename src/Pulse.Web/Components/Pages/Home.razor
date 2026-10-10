@@ -1,26 +1,85 @@
 ﻿@page "/"
 @rendermode InteractiveServer
-@using System.Security.Claims
+@using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Components.Authorization
+@using Pulse.Web.Services
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject QuestionService Questions
+@inject NavigationManager Navigation
+@inject ILogger<Home> Logger
 
 <PageTitle>PULSE</PageTitle>
 
 <h1>PULSE</h1>
+<p>Create a question and share it with your group.</p>
 
-<p>Create a question and see how opinions change.</p>
+<label for="question">Your question</label>
+<textarea id="question"
+          @bind="_text"
+          @bind:event="oninput"
+          maxlength="500"
+          disabled="@_busy"></textarea>
 
-<p>Your participant ID: <code>@_participantId</code></p>
+<button type="button" @onclick="CreateAsync" disabled="@_busy">
+    @(_busy ? "Creating…" : "Create question")
+</button>
+
+@if (_error is not null)
+{
+    <p role="alert">@_error</p>
+}
 
 @code {
-    private string? _participantId;
+    private string _text = string.Empty;
+    private string? _attemptText;
+    private string? _error;
+    private Guid _questionId;
+    private Guid _requestId;
+    private bool _busy;
 
-    protected override async Task OnInitializedAsync()
+    private async Task CreateAsync()
     {
-        var state =
-            await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (_busy)
+            return;
 
-        _participantId = state.User
-            .FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        _busy = true;
+        _error = null;
+
+        try
+        {
+            var text = _text.Trim();
+
+            if (_attemptText != text)
+            {
+                _attemptText = text;
+                _questionId = Guid.NewGuid();
+                _requestId = Guid.NewGuid();
+            }
+
+            var state =
+                await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+            var id = await Questions.CreateAsync(
+                state.User, _questionId, _requestId, text);
+
+            Navigation.NavigateTo($"/questions/{id}");
+        }
+        catch (ValidationException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            _error = "Please reload the page to restore your identity.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Question creation failed.");
+            _error = "Could not create the question. Please try again.";
+        }
+        finally
+        {
+            _busy = false;
+        }
     }
 }

@@ -1,0 +1,65 @@
+﻿@page "/questions/{Id:guid}"
+@using Pulse.Web.Services
+@inject QuestionService Questions
+@inject NavigationManager Navigation
+@inject ILogger<Question> Logger
+
+<PageTitle>PULSE question</PageTitle>
+
+<a href="/">← PULSE</a>
+
+@if (_loading)
+{
+    <p>Loading…</p>
+}
+else if (_error is not null)
+{
+    <p role="alert">@_error</p>
+}
+else if (_question is null)
+{
+    <h1>Question not found</h1>
+}
+else
+{
+    <h1>@_question.Text</h1>
+
+    <p>Created @_question.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm") UTC</p>
+
+    <label for="share-link">Share this question</label>
+    <input id="share-link"
+           readonly
+           value="@Navigation.ToAbsoluteUri($"questions/{Id}")" />
+
+    <p>Voting is coming next.</p>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private QuestionDetails? _question;
+    private string? _error;
+    private bool _loading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _question = null;
+        _error = null;
+
+        try
+        {
+            _question = await Questions.GetAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not load question {QuestionId}", Id);
+            _error = "Could not load the question. Please try again.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}
