@@ -31,6 +31,11 @@ namespace Pulse.Web.Data
             events.HasIndex(e => e.QuestionId)
                 .IsUnique()
                 .HasFilter("\"Kind\" = 'QuestionCreated'");
+
+            events.Property(e => e.RecordedAtUtc)
+                .HasConversion(
+                    value => value,
+                    value => DateTime.SpecifyKind(value, DateTimeKind.Utc));
         }
 
         public override int SaveChanges(bool acceptAllChangesOnSuccess)
