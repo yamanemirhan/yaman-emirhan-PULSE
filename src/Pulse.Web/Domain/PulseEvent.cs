@@ -1,6 +1,4 @@
-﻿using static Pulse.Web.Domain.Enums;
-
-namespace Pulse.Web.Domain
+﻿namespace Pulse.Web.Domain
 {
     public sealed class PulseEvent
     {

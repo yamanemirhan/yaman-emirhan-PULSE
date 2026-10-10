@@ -1,7 +1,5 @@
 ﻿namespace Pulse.Web.Domain
 {
-    public class Enums
-    {
         public enum VoteAnswer
         {
             Yes,
@@ -24,5 +22,4 @@
             EvidenceReviewed,
             QuestionFeatured
         }
-    }
 }

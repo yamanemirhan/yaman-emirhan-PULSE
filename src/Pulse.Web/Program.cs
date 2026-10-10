@@ -1,10 +1,21 @@
+using Microsoft.EntityFrameworkCore;
 using Pulse.Web.Components;
+using Pulse.Web.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+// data directory for the SQLite database
+var dataDirectory = Path.Combine(builder.Environment.ContentRootPath, "App_Data");
+Directory.CreateDirectory(dataDirectory);
+var databasePath = Path.Combine(dataDirectory, "pulse.db");
+builder.Services.AddDbContextFactory<PulseDbContext>(options => options.UseSqlite($"Data Source={databasePath}"));
+
+
+
 
 var app = builder.Build();
 
