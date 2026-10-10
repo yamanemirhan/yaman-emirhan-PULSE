@@ -1,9 +1,19 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 
-@Body
-
+<a class="skip-link" href="#main-content">Skip to content</a>
+<div class="app-shell">
+    <header class="site-header">
+        <a class="brand" href="/" aria-label="PULSE home">
+            <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M4 17h6l3-8 6 15 3-7h6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" /></svg></span>
+            <span>PULSE</span>
+        </a>
+        <span class="header-note">A little clarity, together.</span>
+        <a class="button button-small button-outline" href="/">Ask a question <span aria-hidden="true">↗</span></a>
+    </header>
+    <main id="main-content" class="main-content">@Body</main>
+    <footer class="site-footer"><span>PULSE</span><span>Good questions leave room for a change of mind.</span></footer>
+</div>
 <div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
+    An unhandled error has occurred. <a href="." class="reload">Reload</a>
+    <button type="button" class="dismiss" aria-label="Dismiss error">×</button>
 </div>

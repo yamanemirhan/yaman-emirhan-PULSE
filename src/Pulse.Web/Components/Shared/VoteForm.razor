@@ -1,4 +1,5 @@
-﻿@using System.ComponentModel.DataAnnotations
+@using System.Globalization
+@using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Components.Authorization
 @using Pulse.Web.Domain
 @using Pulse.Web.Services
@@ -6,44 +7,57 @@
 @inject VoteService Votes
 @inject ILogger<VoteForm> Logger
 
-<h2>Your vote</h2>
-
-@if (_saved is not null)
-{
-    <p>Your saved answer: @_saved.Answer — confidence @_saved.Confidence/100</p>
-}
-
-<fieldset disabled="@(_busy || _loadFailed)">
-    <label for="vote-answer">Answer</label>
-    <select id="vote-answer" @bind="_answer">
-        <option value="@VoteAnswer.Yes">Yes</option>
-        <option value="@VoteAnswer.No">No</option>
-        <option value="@VoteAnswer.Unsure">Unsure</option>
-    </select>
-
-    <label for="vote-confidence">Confidence: @_confidence/100</label>
-    <input id="vote-confidence"
-           type="range"
-           min="0"
-           max="100"
-           step="1"
-           @bind="_confidence"
-           @bind:event="oninput" />
-
-    <button type="button" @onclick="SaveAsync">
-        @(_busy ? "Please wait…" : "Save vote")
-    </button>
-</fieldset>
-
-@if (_message is not null)
-{
-    <p role="status">@_message</p>
-}
-
-@if (_error is not null)
-{
-    <p role="alert">@_error</p>
-}
+<section class="card vote-card" aria-labelledby="vote-title">
+    <p class="eyebrow">Your perspective</p>
+    <h2 id="vote-title">Where do you stand?</h2>
+    <p class="muted">Choose an answer and tell us how sure you feel.</p>
+    <fieldset class="vote-fields" disabled="@(_busy || _loadFailed)">
+        <legend class="sr-only">Cast or update your vote</legend>
+        <fieldset class="answer-fieldset">
+            <legend class="field-label">Your answer</legend>
+            <div class="answer-options">
+                @foreach (var answer in Enum.GetValues<VoteAnswer>())
+                {
+                    <label class="answer-option @(_answer == answer ? "selected" : null)">
+                        <input type="radio" name="@($"answer-{QuestionId}")" value="@answer" checked="@(_answer == answer)" @onchange="() => SelectAnswer(answer)" />
+                        <span class="answer-dot @answer.ToString().ToLowerInvariant()" aria-hidden="true"></span><span>@answer</span>
+                    </label>
+                }
+            </div>
+        </fieldset>
+        <div class="confidence-heading">
+            <div><label class="field-label" for="vote-confidence-number">Confidence</label><p class="muted small-text">How sure are you about this answer?</p></div>
+            <div class="confidence-number">
+                <input id="vote-confidence-number" type="number" min="0" max="100" step="1" inputmode="numeric"
+                       value="@_confidenceText" @oninput="ConfidenceInputChanged"
+                       aria-invalid="@(!ConfidenceIsValid ? "true" : "false")" aria-describedby="confidence-help confidence-error" />
+                <span aria-hidden="true">/ 100</span>
+            </div>
+        </div>
+        <label class="sr-only" for="vote-confidence-range">Adjust confidence with slider</label>
+        <input id="vote-confidence-range" class="confidence-range" type="range" min="0" max="100" step="1"
+               value="@_confidence" @oninput="ConfidenceSliderChanged" style="@($"--confidence: {_confidence}%")" />
+        <div class="range-labels" aria-hidden="true"><span>0 · Not confident</span><span>100 · Very confident</span></div>
+        <p id="confidence-help" class="field-help">Drag the slider or type a whole number from 0 to 100.</p>
+        <p id="confidence-error" class="field-error" aria-live="polite">@(!ConfidenceIsValid ? "Enter a whole number between 0 and 100." : null)</p>
+        <button class="button button-primary button-full" type="button" @onclick="SaveAsync" disabled="@(!ConfidenceIsValid)">
+            @(_busy ? "Please wait…" : _saved is null ? "Save my vote" : "Update my vote") <span aria-hidden="true">→</span>
+        </button>
+    </fieldset>
+    @if (_message is not null)
+    {
+        <p class="notice notice-success" role="status">@_message</p>
+    }
+    @if (_error is not null)
+    {
+        <p class="notice notice-error" role="alert">@_error</p>
+    }
+    @if (_saved is not null)
+    {
+        <div class="saved-vote"><span class="saved-indicator" aria-hidden="true">✓</span><span>Saved: <strong>@_saved.Answer</strong> with <strong>@_saved.Confidence/100</strong> confidence.</span></div>
+    }
+    <p class="form-footnote">You can change your mind. Earlier answers stay in your history.</p>
+</section>
 
 @code {
     [Parameter, EditorRequired]
@@ -54,6 +68,7 @@
 
     private VoteAnswer _answer = VoteAnswer.Unsure;
     private int _confidence = 50;
+    private string _confidenceText = "50";
     private VoteCastPayload? _saved;
     private string? _attemptKey;
     private Guid _requestId;
@@ -75,6 +90,7 @@
             {
                 _answer = _saved.Answer;
                 _confidence = _saved.Confidence;
+                _confidenceText = _confidence.ToString(CultureInfo.InvariantCulture);
             }
         }
         catch (Exception ex)
@@ -94,12 +110,17 @@
         if (_busy || _loadFailed)
             return;
 
+        if (!TryGetConfidence(out var confidence))
+        {
+            _error = "Enter a whole number between 0 and 100.";
+            return;
+        }
+
         _busy = true;
         _error = null;
         _message = null;
 
         var answer = _answer;
-        var confidence = _confidence;
 
         try
         {
@@ -142,5 +163,35 @@
         {
             _busy = false;
         }
+    }
+    private bool ConfidenceIsValid => TryGetConfidence(out _);
+
+    private bool TryGetConfidence(out int value) =>
+        int.TryParse(_confidenceText, NumberStyles.Integer, CultureInfo.InvariantCulture, out value)
+        && value is >= 0 and <= 100;
+
+    private void ConfidenceInputChanged(ChangeEventArgs args)
+    {
+        _confidenceText = args.Value?.ToString() ?? string.Empty;
+        if (TryGetConfidence(out var value))
+            _confidence = value;
+        _message = null;
+    }
+
+    private void ConfidenceSliderChanged(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), NumberStyles.Integer,
+                CultureInfo.InvariantCulture, out var value) && value is >= 0 and <= 100)
+        {
+            _confidence = value;
+            _confidenceText = value.ToString(CultureInfo.InvariantCulture);
+        }
+        _message = null;
+    }
+
+    private void SelectAnswer(VoteAnswer answer)
+    {
+        _answer = answer;
+        _message = null;
     }
 }

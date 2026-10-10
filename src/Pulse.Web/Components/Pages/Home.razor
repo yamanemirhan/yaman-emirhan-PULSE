@@ -1,4 +1,4 @@
-﻿@page "/"
+@page "/"
 @rendermode InteractiveServer
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Components.Authorization
@@ -9,25 +9,36 @@
 @inject ILogger<Home> Logger
 
 <PageTitle>PULSE</PageTitle>
-
-<h1>PULSE</h1>
-<p>Create a question and share it with your group.</p>
-
-<label for="question">Your question</label>
-<textarea id="question"
-          @bind="_text"
-          @bind:event="oninput"
-          maxlength="500"
-          disabled="@_busy"></textarea>
-
-<button type="button" @onclick="CreateAsync" disabled="@_busy">
-    @(_busy ? "Creating…" : "Create question")
-</button>
-
-@if (_error is not null)
-{
-    <p role="alert">@_error</p>
-}
+<div class="home-grid">
+    <section class="home-intro" aria-labelledby="home-title">
+        <p class="eyebrow"><span class="eyebrow-line"></span>Every perspective counts</p>
+        <h1 id="home-title">Start with a question.<br /><em>See where people stand.</em></h1>
+        <p class="intro-copy">Ask your group, capture their confidence, and follow how opinions change. A shared view starts with a good question.</p>
+        <ol class="steps">
+            <li><span class="step-number">01</span><div><h2>Ask &amp; share</h2><p>One question. One link for your group.</p></div></li>
+            <li><span class="step-number">02</span><div><h2>Take a position</h2><p>Yes, no, or unsure — and how confident you feel.</p></div></li>
+            <li><span class="step-number">03</span><div><h2>Leave room for change</h2><p>Update your answer. Your earlier view stays in the record.</p></div></li>
+        </ol>
+    </section>
+    <section class="card create-card" aria-labelledby="create-title">
+        <div class="card-heading"><span class="eyebrow">Start a conversation</span><span class="subtle-tag">New question</span></div>
+        <h2 id="create-title">What’s on your mind?</h2>
+        <p class="muted">Ask something your group can answer with yes, no, or unsure.</p>
+        <form @onsubmit="CreateAsync" @onsubmit:preventDefault="true">
+            <label class="field-label" for="question">Your question</label>
+            <textarea id="question" @bind="_text" @bind:event="oninput" maxlength="500" rows="5"
+                      placeholder="Will humans establish a permanent settlement on Mars before 2040?"
+                      aria-describedby="question-hint question-count" disabled="@_busy"></textarea>
+            <div class="field-meta"><span id="question-hint">Keep it clear and open to discussion.</span><span id="question-count">@_text.Length / 500</span></div>
+            @if (_error is not null)
+            {
+                <p class="notice notice-error" role="alert">@_error</p>
+            }
+            <button class="button button-primary button-full" type="submit" disabled="@_busy">@(_busy ? "Creating your question…" : "Create question") <span aria-hidden="true">→</span></button>
+        </form>
+        <p class="form-footnote">You’ll get a link to share. No account needed.</p>
+    </section>
+</div>
 
 @code {
     private string _text = string.Empty;

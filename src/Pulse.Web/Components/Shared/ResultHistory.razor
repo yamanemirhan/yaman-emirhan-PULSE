@@ -1,57 +1,57 @@
-﻿@using System.Text.Json
+@using System.Text.Json
 @using Pulse.Web.Domain
 @using Pulse.Web.Services
 @inject ResultService Results
 @inject ILogger<ResultHistory> Logger
 
-<details>
-    <summary>Stored results and replay</summary>
+<details class="history-panel">
+    <summary class="history-heading"><span><span class="eyebrow">Behind the result</span><span class="history-title">Stored results &amp; replay</span></span><span class="details-chevron" aria-hidden="true">+</span></summary>
+    <div class="history-body">
 
-    <p>
+    <p class="muted">
         Compare saved outputs with a fresh calculation
         using their original event boundaries and versions.
     </p>
 
-    <button type="button" @onclick="CompareAsync" disabled="@_busy">
+    <button class="button button-outline" type="button" @onclick="CompareAsync" disabled="@_busy">
         @(_busy ? "Comparing…" : "Compare stored results")
     </button>
 
     @if (_error is not null)
     {
-        <p role="alert">@_error</p>
+        <p class="notice notice-error" role="alert">@_error</p>
     }
 
     @if (_comparisons is not null)
     {
         @if (_comparisons.Count == 0)
         {
-            <p>No stored results yet.</p>
+            <p class="empty-state compact">No stored results yet.</p>
         }
 
         @foreach (var item in _comparisons)
         {
-            <details @key="item.Id">
+            <details class="history-item" @key="item.Id">
                 <summary>
-                    Through event @item.Stored.ThroughSequence
-                    · @item.Stored.AlgorithmVersion
-                    · @(item.Matches ? "Match" : "MISMATCH")
+                    <span>Through event <strong>@item.Stored.ThroughSequence</strong> <span class="muted">· @item.Stored.AlgorithmVersion</span></span>
+                    <span class="status-badge @(item.Matches ? "status-match" : "status-mismatch")">@(item.Matches ? "Match" : "MISMATCH")</span>
                 </summary>
 
-                <p>
+                <p class="history-timestamp">
                     First prepared:
                     @item.ServedAtUtc.ToString("yyyy-MM-dd HH:mm:ss") UTC
                 </p>
 
-                <h3>Stored output</h3>
-                <pre>@ToJson(item.Stored)</pre>
-
-                <h3>Replayed output</h3>
-                <pre>@ToJson(item.Replayed)</pre>
+                <div class="replay-grid">
+                    <div><h3>Stored output</h3><pre>@ToJson(item.Stored)</pre></div>
+                    <div><h3>Replayed output</h3><pre>@ToJson(item.Replayed)</pre></div>
+                </div>
             </details>
         }
 
-        <p>Run the comparison again after new votes.</p>
+        <p class="field-help">Run the comparison again after new votes.</p>
     }
+    </div>
 </details>
 
 @code {

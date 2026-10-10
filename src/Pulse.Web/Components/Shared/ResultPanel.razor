@@ -1,57 +1,45 @@
-﻿@using System.Globalization
+@using System.Globalization
 @using Pulse.Web.Domain
 @using Pulse.Web.Services
 @inject ResultService Results
 @inject ILogger<ResultPanel> Logger
 
-<h2>Current result</h2>
-
-@if (_error is not null)
-{
-    <p role="alert">@_error</p>
-}
-else if (_result is null)
-{
-    <p>Loading results…</p>
-}
-else if (_result.ParticipantCount == 0)
-{
-    <p>No votes yet.</p>
-}
-else
-{
-    <p>Participants: @_result.ParticipantCount</p>
-
-    <table>
-        <thead>
-            <tr>
-                <th>Answer</th>
-                <th>People</th>
-                <th>Share (%)</th>
-                <th>Average confidence</th>
-            </tr>
-        </thead>
-        <tbody>
+<section class="card results-card" aria-labelledby="results-title">
+    <div class="card-heading"><p class="eyebrow">The group’s perspective</p><span class="subtle-tag">Latest answers</span></div>
+    <h2 id="results-title">Where the group stands</h2>
+    <p class="muted">A snapshot of everyone’s latest view.</p>
+    @if (_error is not null)
+    {
+        <p class="notice notice-error" role="alert">@_error</p>
+    }
+    else if (_result is null)
+    {
+        <div class="empty-state compact" role="status"><span class="loading-dot"></span><p>Loading results…</p></div>
+    }
+    else if (_result.ParticipantCount == 0)
+    {
+        <div class="empty-state compact"><div class="empty-mark" aria-hidden="true">—</div><h3>No votes yet</h3><p class="muted">Be the first to share a perspective.<br />The group’s results will appear here.</p></div>
+    }
+    else
+    {
+        <div class="answer-summaries">
             @foreach (var row in _result.Answers)
             {
-                <tr>
-                    <td>@row.Answer</td>
-                    <td>@row.Count</td>
-                    <td>@Format(row.Percentage)</td>
-                    <td>@Format(row.AverageConfidence)</td>
-                </tr>
+                <div class="answer-summary @row.Answer.ToString().ToLowerInvariant()">
+                    <span class="answer-name"><span class="answer-dot @row.Answer.ToString().ToLowerInvariant()" aria-hidden="true"></span>@row.Answer</span>
+                    <strong class="answer-percentage">@Format(row.Percentage)<span>%</span></strong>
+                    <span class="answer-count">@row.Count @(row.Count == 1 ? "person" : "people")</span>
+                    <div class="answer-confidence"><span>Avg. confidence</span><strong>@Format(row.AverageConfidence)</strong></div>
+                </div>
             }
-        </tbody>
-    </table>
-
-    <p>
-        Changed their answer:
-        @_result.ChangedAnswerCount
-        (@Format(_result.ChangedAnswerPercentage)%)
-    </p>
-
-    <p>Each participant counts equally. Confidence is self-reported.</p>
-}
+        </div>
+        <dl class="result-stats">
+            <div><dt>Participants</dt><dd>@_result.ParticipantCount</dd></div>
+            <div><dt>Changed their answer</dt><dd>@_result.ChangedAnswerCount <span>(@Format(_result.ChangedAnswerPercentage)%)</span></dd></div>
+        </dl>
+        <p class="result-note">Each participant counts once. Confidence is self-reported and does not change vote weight.</p>
+    }
+</section>
 
 @code {
     [Parameter, EditorRequired]

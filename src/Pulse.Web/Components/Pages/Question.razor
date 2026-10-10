@@ -1,47 +1,49 @@
-﻿@page "/questions/{Id:guid}"
+@page "/questions/{Id:guid}"
 @rendermode InteractiveServer
 @inject QuestionService Questions
 @inject NavigationManager Navigation
 @inject ILogger<Question> Logger
+@inject IJSRuntime JS
 @using Pulse.Web.Services
 @using Pulse.Web.Components.Shared
 
-<PageTitle>PULSE question</PageTitle>
-
-<a href="/">← PULSE</a>
-
+<PageTitle>@(_question is null ? "Question · PULSE" : $"{_question.Text} · PULSE")</PageTitle>
+<a class="back-link" href="/">← Ask another question</a>
 @if (_loading)
 {
-    <p>Loading…</p>
+    <div class="card empty-state" role="status"><span class="loading-dot"></span><p>Loading your question…</p></div>
 }
 else if (_error is not null)
 {
-    <p role="alert">@_error</p>
+    <div class="notice notice-error" role="alert">@_error</div>
 }
 else if (_question is null)
 {
-    <h1>Question not found</h1>
+    <section class="card empty-state"><h1>Question not found</h1><p class="muted">Check the link, or start a new conversation.</p><a class="button button-primary" href="/">Create a question</a></section>
 }
 else
 {
-    <h1>@_question.Text</h1>
-
-    <p>Created @_question.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm") UTC</p>
-
-    <label for="share-link">Share this question</label>
-    <input id="share-link"
-           readonly
-           value="@Navigation.ToAbsoluteUri($"questions/{Id}")" />
-
-    <VoteForm QuestionId="@Id"
-              @key="Id"
-              OnSaved="RefreshResults" />
-
-    <ResultPanel QuestionId="@Id"
-                 Revision="@_resultRevision" />
-
-    <ResultHistory QuestionId="@Id"
-              @key="(Id, nameof(ResultHistory))" />
+    <header class="question-heading">
+        <p class="eyebrow">A question for your group</p>
+        <h1>@_question.Text</h1>
+        <p class="question-meta">Created @_question.CreatedAtUtc.ToString("dd MMM yyyy · HH:mm", System.Globalization.CultureInfo.InvariantCulture) UTC</p>
+    </header>
+    <section class="share-panel" aria-label="Share question">
+        <div><label class="field-label" for="share-link">Bring your group into the conversation</label><p class="muted">Anyone with this link can take part.</p></div>
+        <div class="share-controls">
+            <input id="share-link" readonly value="@Navigation.ToAbsoluteUri($"questions/{Id}")" />
+            <button class="button button-outline" type="button" @onclick="CopyLinkAsync">@(_copied ? "Copied!" : "Copy link")</button>
+        </div>
+        @if (_copyMessage is not null)
+        {
+            <p class="share-message" role="status">@_copyMessage</p>
+        }
+    </section>
+    <div class="question-grid">
+        <VoteForm QuestionId="@Id" @key="Id" OnSaved="RefreshResults" />
+        <ResultPanel QuestionId="@Id" Revision="@_resultRevision" />
+    </div>
+    <ResultHistory QuestionId="@Id" @key="(Id, nameof(ResultHistory))" />
 }
 
 @code {
@@ -52,12 +54,16 @@ else
     private string? _error;
     private bool _loading = true;
     private int _resultRevision;
+    private bool _copied;
+    private string? _copyMessage;
 
     protected override async Task OnParametersSetAsync()
     {
         _loading = true;
         _question = null;
         _error = null;
+        _copied = false;
+        _copyMessage = null;
 
         try
         {
@@ -77,5 +83,19 @@ else
     private void RefreshResults()
     {
         _resultRevision++;
+    }
+    private async Task CopyLinkAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText",
+                Navigation.ToAbsoluteUri($"questions/{Id}").ToString());
+            _copied = true;
+            _copyMessage = "Link copied. Share it with your group.";
+        }
+        catch (JSException)
+        {
+            _copyMessage = "Select the link above and copy it manually.";
+        }
     }
 }
