@@ -26,7 +26,7 @@ else
     <header class="question-heading">
         <p class="eyebrow">A question for your group</p>
         <h1>@_question.Text</h1>
-        <p class="question-meta">Created @_question.CreatedAtUtc.ToString("dd MMM yyyy · HH:mm", System.Globalization.CultureInfo.InvariantCulture) UTC</p>
+        <p class="question-meta">Created <LocalTime Utc="@_question.CreatedAtUtc" /></p>
     </header>
     <section class="share-panel" aria-label="Share question">
         <div><label class="field-label" for="share-link">Bring your group into the conversation</label><p class="muted">Anyone with this link can take part.</p></div>
@@ -39,11 +39,13 @@ else
             <p class="share-message" role="status">@_copyMessage</p>
         }
     </section>
+    <FeatureQuestionPanel QuestionId="@Id" OnChanged="RefreshResults" @key="(Id, nameof(FeatureQuestionPanel))" />
     <div class="question-grid">
         <VoteForm QuestionId="@Id" @key="Id" OnSaved="RefreshResults" />
         <ResultPanel QuestionId="@Id" Revision="@_resultRevision" />
     </div>
     <ResultHistory QuestionId="@Id" @key="(Id, nameof(ResultHistory))" />
+    <OpinionChart QuestionId="@Id" Revision="@_resultRevision" @key="(Id, nameof(OpinionChart))" />
     <EvidencePanel QuestionId="@Id" @key="(Id, nameof(EvidencePanel))" OnChanged="RefreshResults" />
     <TimelinePanel QuestionId="@Id" Revision="@_resultRevision" @key="(Id, nameof(TimelinePanel))" />
 }

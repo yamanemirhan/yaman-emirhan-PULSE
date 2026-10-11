@@ -1,7 +1,7 @@
 @page "/questions"
 @rendermode InteractiveServer
 @using System.ComponentModel.DataAnnotations
-@using System.Globalization
+@using Pulse.Web.Components.Shared
 @using Microsoft.AspNetCore.Components.Authorization
 @using Pulse.Web.Domain
 @using Pulse.Web.Services
@@ -52,7 +52,7 @@ else if (_page is not null)
                 <li class="card question-list-item" @key="question.Id">
                     <div>
                         <h2><a href="@($"/questions/{question.Id}")">@question.Text</a></h2>
-                        <p class="question-meta">Created @question.CreatedAtUtc.ToString("dd MMM yyyy · HH:mm", CultureInfo.InvariantCulture) UTC</p>
+                        <p class="question-meta">Created <LocalTime Utc="@question.CreatedAtUtc" /></p>
                     </div>
                     <span class="question-list-arrow" aria-hidden="true">↗</span>
                 </li>

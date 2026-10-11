@@ -4,7 +4,7 @@ namespace Pulse.Web.Domain
 {
     public static class ResultCalculator
     {
-        public const string CurrentVersion = "v1";
+        public const string CurrentVersion = "v2";
 
         public static ResultSnapshot Calculate(
             Guid questionId,
@@ -12,7 +12,7 @@ namespace Pulse.Web.Domain
             long throughSequence,
             string algorithmVersion = CurrentVersion)
         {
-            if (algorithmVersion != CurrentVersion)
+            if (algorithmVersion is not ("v1" or "v2"))
                 throw new NotSupportedException("Unsupported calculation version.");
 
             var histories = events
@@ -35,6 +35,7 @@ namespace Pulse.Web.Domain
                 .ToList();
 
             var participantCount = latestVotes.Count;
+            var totalConfidence = latestVotes.Sum(v => (long)v.Confidence);
 
             var changedCount = histories.Count(history =>
                 history.Select(v => v.Answer).Distinct().Count() > 1);
@@ -54,7 +55,10 @@ namespace Pulse.Web.Domain
                         answer,
                         group.Count,
                         Percentage(group.Count, participantCount),
-                        average);
+                        average,
+                        algorithmVersion == "v2" && totalConfidence > 0
+                            ? Round(100m * group.Sum(v => (long)v.Confidence) / totalConfidence)
+                            : null);
                 })
                 .ToArray();
 
@@ -65,7 +69,8 @@ namespace Pulse.Web.Domain
                 participantCount,
                 changedCount,
                 Percentage(changedCount, participantCount),
-                summaries);
+                summaries,
+                algorithmVersion == "v2" ? totalConfidence : null);
         }
 
         private static VoteCastPayload ReadVote(PulseEvent pulseEvent)

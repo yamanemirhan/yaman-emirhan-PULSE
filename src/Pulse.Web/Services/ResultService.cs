@@ -79,7 +79,7 @@ namespace Pulse.Web.Services
 
         private static ResultSnapshot ReadSnapshot(PresentedResult stored)
         {
-            if (stored.AlgorithmVersion != ResultCalculator.CurrentVersion)
+            if (stored.AlgorithmVersion is not ("v1" or "v2"))
                 throw new NotSupportedException("Unsupported calculation version.");
 
             var snapshot =
@@ -154,6 +154,7 @@ namespace Pulse.Web.Services
                 && first.ParticipantCount == second.ParticipantCount
                 && first.ChangedAnswerCount == second.ChangedAnswerCount
                 && first.ChangedAnswerPercentage == second.ChangedAnswerPercentage
+                && first.TotalConfidence == second.TotalConfidence
                 && first.Answers.SequenceEqual(second.Answers);
         }
     }

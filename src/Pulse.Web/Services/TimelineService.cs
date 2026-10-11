@@ -7,6 +7,9 @@ namespace Pulse.Web.Services;
 
 public sealed class TimelineService(IDbContextFactory<PulseDbContext> dbFactory)
 {
+    public async Task<OpinionTrendData> GetTrendAsync(ClaimsPrincipal user, Guid questionId) =>
+        OpinionTrendBuilder.Build(await GetAsync(user, questionId));
+
     public async Task<IReadOnlyList<TimelineEntry>> GetAsync(ClaimsPrincipal user, Guid questionId)
     {
         if (user.Identity?.IsAuthenticated != true ||

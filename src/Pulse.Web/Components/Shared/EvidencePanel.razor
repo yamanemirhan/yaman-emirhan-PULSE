@@ -1,5 +1,4 @@
 @using System.ComponentModel.DataAnnotations
-@using System.Globalization
 @using System.Security.Claims
 @using System.Text.Json
 @using Microsoft.AspNetCore.Components.Authorization
@@ -60,11 +59,11 @@
                         <span class="status-badge @(item.Status == EvidenceStatus.Approved ? "status-match" : item.Status == EvidenceStatus.Rejected ? "status-mismatch" : "status-pending")">@item.Status</span></div>
                     <h3><a href="@item.Url" target="_blank" rel="noopener noreferrer">@item.Title <span aria-hidden="true">↗</span></a></h3>
                     <p class="evidence-summary">@item.Summary</p>
-                    <p class="question-meta">Submitted @FormatTime(item.SubmittedAtUtc) UTC</p>
+                    <p class="question-meta">Submitted <LocalTime Utc="@item.SubmittedAtUtc" /></p>
                     @if (item.ReviewedAtUtc is { } reviewedAt)
                     {
                         <div class="evidence-decision"><strong>Latest review: @item.Status</strong>
-                            <p>@item.ReviewReason</p><span class="question-meta">@FormatTime(reviewedAt) UTC</span></div>
+                            <p>@item.ReviewReason</p><span class="question-meta"><LocalTime Utc="@reviewedAt" /></span></div>
                     }
                     @if (_canReview && item.SubmittedBy != _viewerId)
                     {
@@ -157,5 +156,4 @@
         await OnChanged.InvokeAsync();
     }
 
-    private static string FormatTime(DateTime time) => time.ToString("dd MMM yyyy · HH:mm:ss", CultureInfo.InvariantCulture);
 }

@@ -1,0 +1,177 @@
+@using System.Globalization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Pulse.Web.Domain
+@using Pulse.Web.Services
+@inject TimelineService Timeline
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IJSRuntime JS
+@inject ILogger<OpinionChart> Logger
+@implements IAsyncDisposable
+
+<section class="card opinion-chart" aria-labelledby="opinion-title">
+    <header class="question-list-heading">
+        <div><p class="eyebrow">Beyond the majority</p><h2 id="opinion-title">How conviction compares</h2>
+            <p class="muted">Compare equal votes with the confidence behind them, across recorded activity.</p></div>
+        <button class="button button-outline" type="button" @onclick="LoadAsync" disabled="@_loading">Refresh chart</button>
+    </header>
+    <div class="opinion-answer-picker" role="group" aria-label="Answer to compare">
+        @foreach (var answer in Enum.GetValues<VoteAnswer>())
+        {
+            <button class="button button-small @(_answer == answer ? "button-primary" : "button-outline")"
+                type="button" aria-pressed="@(_answer == answer ? "true" : "false")" @onclick="() => Select(answer)">@answer</button>
+        }
+    </div>
+    @if (_error is not null) { <p class="notice notice-error" role="alert">@_error</p> }
+    @if (_loading) { <p class="muted" role="status">Loading opinion history…</p> }
+    @if (Latest is { } result)
+    {
+        var answer = result.Answers.Single(a => a.Answer == _answer);
+        <div class="opinion-metrics">
+            <div><span>Latest @_answer votes</span><strong>@Percent(answer.Percentage)</strong></div>
+            <div><span>Confidence-weighted @_answer</span><strong>@Percent(answer.ConfidenceWeightedPercentage)</strong></div>
+            <div><span>Participants</span><strong>@result.ParticipantCount</strong></div>
+        </div>
+        <p class="opinion-interpretation">@Interpret(answer)</p>
+        <p class="field-help">@result.ChangedAnswerCount of @result.ParticipantCount participants have changed their answer at least once.
+            Confidence-only revisions affect this chart but do not count as an answer change.</p>
+    }
+    else if (!_loading && _error is null)
+    {
+        <p class="empty-state compact">No votes yet. The comparison will appear after the first vote.</p>
+    }
+    <div class="opinion-canvas-wrap" hidden="@(Latest is null)">
+        <canvas @ref="_canvas" role="img" aria-label="@($"Recorded {_answer} vote share and confidence-weighted share. Equivalent values are available in the data table below.")"></canvas>
+    </div>
+    @if (Latest is not null)
+    {
+        <p class="field-help">Dashed: one person, one vote. Solid: confidence-weighted view. Steps change only when a vote is recorded.
+            Activity is evenly spaced, not proportional to elapsed time; timestamps use your browser's time zone.</p>
+    }
+    @if (_trend is not null)
+    {
+        @if (_trend.Markers.Count > 0)
+        {
+            <details class="opinion-evidence"><summary>Evidence activity (@_trend.Markers.Count)</summary>
+                <ul class="timeline-source-list">
+                    @foreach (var marker in _trend.Markers)
+                    {
+                        <li><strong>@marker.Label · @marker.Action</strong> · <LocalTime Utc="@marker.RecordedAtUtc" />
+                            @foreach (var source in marker.Sources)
+                            {
+                                <div>@if (source.Url is { } url) { <a href="@url" target="_blank" rel="noopener noreferrer">@source.Title ↗</a> }
+                                    else { <span class="muted">@source.Title</span> }</div>
+                            }
+                        </li>
+                    }
+                </ul>
+            </details>
+        }
+        @if (Latest is not null)
+        {
+            <details class="opinion-data"><summary>View chart data</summary>
+                <div class="opinion-table-scroll"><table>
+                    <caption>@_answer comparison · reconstructed with calculation @_trend.AlgorithmVersion</caption>
+                    <thead><tr><th scope="col">Time</th><th scope="col">Activity</th><th scope="col">Participants</th><th scope="col">Vote share</th><th scope="col">Weighted share</th></tr></thead>
+                    <tbody>@foreach (var point in _trend.Points)
+                    {
+                        var answer = point.Result?.Answers.Single(a => a.Answer == _answer);
+                        <tr><td><LocalTime Utc="@point.RecordedAtUtc" /></td><td>@point.Activity</td><td>@(point.Result?.ParticipantCount ?? 0)</td>
+                            <td>@Percent(answer?.Percentage)</td><td>@Percent(answer?.ConfidenceWeightedPercentage)</td></tr>
+                    }</tbody>
+                </table></div>
+            </details>
+        }
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public Guid QuestionId { get; set; }
+    [Parameter] public int Revision { get; set; }
+    private readonly string _chartId = Guid.NewGuid().ToString("N");
+    private OpinionTrendData? _trend;
+    private ResultSnapshot? Latest => _trend?.Points.LastOrDefault()?.Result;
+    private VoteAnswer _answer = VoteAnswer.Yes;
+    private ElementReference _canvas;
+    private IJSObjectReference? _module;
+    private Guid _loadedQuestion;
+    private int _loadedRevision = -1, _loadVersion;
+    private bool _loading, _needsDraw, _disposed;
+    private string? _error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedQuestion == QuestionId && _loadedRevision == Revision) return;
+        _loadedQuestion = QuestionId;
+        _loadedRevision = Revision;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var version = ++_loadVersion;
+        _loading = true;
+        _error = null;
+        try
+        {
+            var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var trend = await Timeline.GetTrendAsync(state.User, QuestionId);
+            if (_disposed || version != _loadVersion) return;
+            _trend = trend;
+            _needsDraw = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Opinion chart could not be loaded.");
+            if (version == _loadVersion) { _trend = null; _error = "Could not load opinion history. Please refresh the chart."; }
+        }
+        finally { if (version == _loadVersion) _loading = false; }
+    }
+
+    private void Select(VoteAnswer answer) { _answer = answer; _needsDraw = true; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_disposed || _loading || !_needsDraw || _trend is null || Latest is null) return;
+        _needsDraw = false;
+        try
+        {
+            _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/opinion-chart.js");
+            if (_disposed) { await _module.DisposeAsync(); return; }
+            var points = _trend.Points.Select(p => new
+            {
+                p.Sequence, TimeUtc = DateTime.SpecifyKind(p.RecordedAtUtc, DateTimeKind.Utc).ToString("O"),
+                p.Activity, Participants = p.Result?.ParticipantCount ?? 0,
+                Share = p.Result?.Answers.Single(a => a.Answer == _answer).Percentage,
+                Weighted = p.Result?.Answers.Single(a => a.Answer == _answer).ConfidenceWeightedPercentage
+            });
+            await _module.InvokeVoidAsync("render", _chartId, _canvas, points, _trend.Markers, _answer.ToString());
+        }
+        catch (JSDisconnectedException) { }
+        catch (TaskCanceledException) { }
+        catch (JSException ex)
+        {
+            Logger.LogWarning(ex, "Chart rendering failed.");
+            _error = "The chart could not be drawn. The comparison and data table remain available.";
+            if (!_disposed) StateHasChanged();
+        }
+    }
+
+    private static string Percent(decimal? value) => value is null ? "Unavailable" : $"{value.Value.ToString("0.0", CultureInfo.InvariantCulture)}%";
+    private static string Interpret(AnswerSummary answer)
+    {
+        if (answer.ConfidenceWeightedPercentage is null)
+            return "The weighted comparison is unavailable because the group's total confidence is zero.";
+        var gap = answer.ConfidenceWeightedPercentage.Value - answer.Percentage!.Value;
+        if (gap == 0) return $"{answer.Answer} has the same share in both views at the displayed precision.";
+        return $"{answer.Answer}'s confidence-weighted share is {Math.Abs(gap).ToString("0.0", CultureInfo.InvariantCulture)} percentage points {(gap > 0 ? "higher" : "lower")} than its vote share. Its supporters report {(gap > 0 ? "higher" : "lower")} average confidence than the group overall.";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        if (_module is null) return;
+        try { await _module.InvokeVoidAsync("destroy", _chartId); await _module.DisposeAsync(); }
+        catch (JSDisconnectedException) { }
+        catch (TaskCanceledException) { }
+    }
+}

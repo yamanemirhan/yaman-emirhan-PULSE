@@ -1,0 +1,91 @@
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Authorization
+@using Pulse.Web.Services
+@inject RoomService Room
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ILogger<FeatureQuestionPanel> Logger
+
+<AuthorizeView Roles="Administrator">
+    <Authorized>
+        <section class="card feature-question" aria-label="Room controls">
+            <div><p class="eyebrow">Administrator · Shared room</p><h2>Set the group's focus</h2>
+                <p class="muted">Everyone in the Room sees the same featured question.</p>
+                @if (_loaded)
+                {
+                    <p>@(_current?.QuestionId == QuestionId ? "This question is featured in the Room."
+                        : _current is null ? "No question is featured yet." : $"Currently featured: {_current.QuestionText}")</p>
+                }
+            </div>
+            <div class="feature-actions">
+                <button class="button button-primary" type="button" @onclick="FeatureAsync"
+                    disabled="@(_busy || !_loaded || _current?.QuestionId == QuestionId)">Feature in Room</button>
+                <button class="button button-outline" type="button" @onclick="LoadAsync" disabled="@_busy">Refresh room status</button>
+                <a href="/room">Open Room →</a>
+            </div>
+            @if (_error is not null) { <p class="notice notice-error" role="alert">@_error</p> }
+            @if (_message is not null) { <p class="notice notice-success" role="status">@_message</p> }
+        </section>
+    </Authorized>
+</AuthorizeView>
+
+@code {
+    [Parameter, EditorRequired] public Guid QuestionId { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+    private RoomState? _current;
+    private bool _busy, _loaded;
+    private string? _error, _message;
+    private Guid _requestId = Guid.NewGuid();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (state.User.IsInRole("Administrator")) await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        if (_busy) return;
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            _current = await Room.GetAsync();
+            _loaded = true;
+            _requestId = Guid.NewGuid();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not read room status.");
+            _loaded = false;
+            _error = "Could not read room status. Please refresh.";
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task FeatureAsync()
+    {
+        if (_busy || !_loaded || _current?.QuestionId == QuestionId) return;
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var result = await Room.FeatureAsync(state.User, QuestionId, _requestId, _current?.FeatureSequence ?? 0);
+            _current = await Room.GetAsync();
+            _requestId = Guid.NewGuid();
+            _message = result.IsDuplicate ? "This request was already recorded. The current Room status is shown."
+                : "Room updated. Connected viewers will see the change on their next refresh.";
+            await OnChanged.InvokeAsync();
+        }
+        catch (ValidationException ex) { _error = ex.Message; }
+        catch (UnauthorizedAccessException) { _error = "Only Administrator can feature a question."; }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not update the Room.");
+            _error = "Could not update the Room. Try again or refresh its status.";
+        }
+        finally { _busy = false; }
+    }
+}

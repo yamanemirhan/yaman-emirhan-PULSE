@@ -66,6 +66,7 @@ builder.Services.AddScoped<VoteService>();
 builder.Services.AddScoped<ResultService>();
 builder.Services.AddScoped<EvidenceService>();
 builder.Services.AddScoped<TimelineService>();
+builder.Services.AddScoped<RoomService>();
 
 var app = builder.Build();
 

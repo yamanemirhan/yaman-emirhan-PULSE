@@ -9,7 +9,7 @@
 <section class="timeline-section" aria-labelledby="timeline-title">
     <header class="question-list-heading">
         <div><p class="eyebrow">How views evolved</p><h2 id="timeline-title">Question timeline</h2>
-            <p class="muted">Votes and evidence in recorded order, newest first. Times are UTC.</p></div>
+            <p class="muted">Votes and evidence in recorded order, newest first. Times use your browser's time zone.</p></div>
         <button type="button" class="button button-outline" @onclick="LoadAsync" disabled="@_loading">Refresh timeline</button>
     </header>
     <p class="field-help">Results are reconstructed after each vote. Available evidence does not prove someone read it or changed their mind because of it.</p>
@@ -31,7 +31,7 @@
             @foreach (var item in _items.Take(_visibleCount))
             {
                 <li class="card timeline-item" @key="item.Sequence">
-                    <p class="question-meta"><time datetime="@item.RecordedAtUtc.ToString("O")">@item.RecordedAtUtc.ToString("dd MMM yyyy · HH:mm:ss", CultureInfo.InvariantCulture) UTC</time></p>
+                    <p class="question-meta"><LocalTime Utc="@item.RecordedAtUtc" /></p>
                     <h3>@item.Title</h3>
                     <p class="timeline-description">@item.Description</p>
                     @if (item.Result is { } result)

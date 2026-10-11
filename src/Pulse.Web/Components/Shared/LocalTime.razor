@@ -1,0 +1,54 @@
+@using System.Globalization
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<time datetime="@_isoUtc" title="@_utcLabel">@(_localLabel ?? _utcLabel)</time>
+
+@code {
+    [Parameter, EditorRequired] public DateTime Utc { get; set; }
+
+    private string _isoUtc = "", _utcLabel = "";
+    private string? _localLabel, _attemptedUtc;
+    private IJSObjectReference? _module;
+    private bool _disposed;
+
+    protected override void OnParametersSet()
+    {
+        // SQLite may return Unspecified; this parameter always represents a stored UTC instant.
+        var utc = DateTime.SpecifyKind(Utc, DateTimeKind.Utc);
+        var iso = utc.ToString("O", CultureInfo.InvariantCulture);
+        if (iso == _isoUtc) return;
+        _isoUtc = iso;
+        _utcLabel = utc.ToString("dd MMM yyyy · HH:mm:ss 'UTC'", CultureInfo.InvariantCulture);
+        _localLabel = null;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_disposed || _attemptedUtc == _isoUtc) return;
+        var iso = _isoUtc;
+        _attemptedUtc = iso;
+        try
+        {
+            _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/local-time.js");
+            var label = await _module.InvokeAsync<string>("formatLocalTime", iso);
+            if (!_disposed && iso == _isoUtc)
+            {
+                _localLabel = label;
+                StateHasChanged();
+            }
+        }
+        catch (JSDisconnectedException) { /* The UTC fallback remains usable. */ }
+        catch (JSException) { /* A browser without Intl support still displays explicit UTC. */ }
+        catch (TaskCanceledException) { /* Navigation may end the circuit during formatting. */ }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        if (_module is null) return;
+        try { await _module.DisposeAsync(); }
+        catch (JSDisconnectedException) { }
+        catch (TaskCanceledException) { }
+    }
+}

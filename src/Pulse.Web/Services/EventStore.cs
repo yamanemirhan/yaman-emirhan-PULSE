@@ -52,6 +52,28 @@ namespace Pulse.Web.Services
                 return new AppendResult(existing.Sequence, IsDuplicate: true);
             }
 
+            if (draft.Kind == PulseEventKind.QuestionFeatured)
+            {
+                if (draft.ActorRole != PulseRole.Administrator)
+                    throw new UnauthorizedAccessException("Only Administrator can feature a question.");
+                if (draft.PayloadVersion != 1)
+                    throw new NotSupportedException("Unsupported room payload version.");
+                var payload = JsonSerializer.Deserialize<QuestionFeaturedPayload>(draft.PayloadJson)
+                    ?? throw new ValidationException("Invalid room update.");
+                if (payload.ExpectedFeatureSequence < 0)
+                    throw new ValidationException("Invalid room boundary.");
+                if (!await db.Events.AnyAsync(e => e.QuestionId == draft.QuestionId &&
+                    e.Kind == PulseEventKind.QuestionCreated, cancellationToken))
+                    throw new ValidationException("Question not found.");
+                var featured = await db.Events.AsNoTracking()
+                    .Where(e => e.Kind == PulseEventKind.QuestionFeatured)
+                    .OrderByDescending(e => e.Sequence).FirstOrDefaultAsync(cancellationToken);
+                if ((featured?.Sequence ?? 0) != payload.ExpectedFeatureSequence)
+                    throw new ValidationException("The Room was changed by another request. Refresh room status before trying again.");
+                if (featured?.QuestionId == draft.QuestionId)
+                    return new AppendResult(featured.Sequence, IsDuplicate: false, IsUnchanged: true);
+            }
+
             // Compare against the latest vote while holding SQLite's write lock.
             // A UI-only check would allow two concurrent submissions to append the same vote.
             if (draft.Kind == PulseEventKind.VoteCast)

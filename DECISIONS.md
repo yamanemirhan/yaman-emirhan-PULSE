@@ -31,3 +31,11 @@ Timeline reads create no PresentedResults. It refreshes after this page's action
 or manually for other sessions. The prototype replays one question's full history
 and initially renders 20 entries; large histories need incremental projections
 and server-side pagination.
+
+## Shared Room
+
+Connected Room views poll every two seconds and reload results when the featured
+question or its event boundary changes. This is near-live, not simultaneous across
+clients. Voting and evidence remain on the question page. Polling is intentionally 
+simple for the prototype. It adds one state query per viewer every two seconds; 
+high traffic needs shared projections, caching and push updates.

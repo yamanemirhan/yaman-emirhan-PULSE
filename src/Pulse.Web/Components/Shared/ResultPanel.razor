@@ -22,6 +22,17 @@
     }
     else
     {
+        <p class="result-description">@DescribeResult(_result)</p>
+        <figure class="result-chart">
+            <figcaption class="field-help">Latest answer distribution</figcaption>
+            <div class="result-distribution" role="img" aria-label="@ChartLabel(_result)">
+                @foreach (var row in _result.Answers.Where(a => a.Count > 0))
+                {
+                    <span class="distribution-segment @row.Answer.ToString().ToLowerInvariant()"
+                        style="@($"flex-grow: {row.Count.ToString(CultureInfo.InvariantCulture)}")"></span>
+                }
+            </div>
+        </figure>
         <div class="answer-summaries">
             @foreach (var row in _result.Answers)
             {
@@ -51,9 +62,14 @@
     private ResultSnapshot? _result;
     private string? _error;
     private int _loadVersion;
+    private Guid _loadedQuestion;
+    private int _loadedRevision = -1;
 
     protected override async Task OnParametersSetAsync()
     {
+        if (_loadedQuestion == QuestionId && _loadedRevision == Revision && _error is null) return;
+        _loadedQuestion = QuestionId;
+        _loadedRevision = Revision;
         var version = ++_loadVersion;
         _result = null;
         _error = null;
@@ -76,4 +92,16 @@
 
     private static string Format(decimal? value) =>
         value?.ToString("0.0", CultureInfo.InvariantCulture) ?? "—";
+
+    private static string ChartLabel(ResultSnapshot result) => string.Join("; ",
+        result.Answers.Select(a => $"{a.Answer}: {a.Count} votes, {Format(a.Percentage)} percent"));
+
+    private static string DescribeResult(ResultSnapshot result)
+    {
+        var largest = result.Answers.Max(a => a.Count);
+        var leaders = result.Answers.Where(a => a.Count == largest).ToArray();
+        return leaders.Length == 1
+            ? $"{leaders[0].Answer} currently leads with {Format(leaders[0].Percentage)}% of participants."
+            : $"{string.Join(" and ", leaders.Select(a => a.Answer))} are tied at {Format(leaders[0].Percentage)}% each.";
+    }
 }

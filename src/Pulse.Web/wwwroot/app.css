@@ -278,3 +278,41 @@ pre { margin: 0; padding: 16px; border-radius: 8px; background: #f2f4ed; color: 
 .timeline-sources summary { cursor: pointer; font-weight: 600; }
 .timeline-source-list { padding-left: 1.2rem; margin-bottom: 0; overflow-wrap: anywhere; }
 .timeline-source-list li + li { margin-top: .5rem; }
+.feature-question { margin-bottom: 1.5rem; }
+.feature-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
+.feature-question .notice { margin: 1rem 0 0; }
+.room-question { margin-bottom: 1.5rem; }
+.room-question h2 { font-family: Georgia, serif; font-size: clamp(1.6rem, 4vw, 2.6rem); overflow-wrap: anywhere; }
+.room-note { margin-top: 1rem; }
+.result-description { font-weight: 600; margin: 1.5rem 0 .75rem; }
+.result-chart { margin: 0 0 1.5rem; }
+.result-chart figcaption { margin-bottom: .5rem; }
+.result-distribution { display: flex; height: 14px; overflow: hidden; border-radius: 8px; background: var(--line); }
+.distribution-segment { flex-basis: 0; }
+.distribution-segment.yes { background: var(--yes); }
+.distribution-segment.no { background: var(--no); }
+.distribution-segment.unsure { background: var(--unsure); }
+@media (max-width: 900px) {
+    .site-header { flex-wrap: wrap; padding-top: 1rem; padding-bottom: 1rem; gap: .75rem; }
+    .header-note { display: none; }
+}
+.opinion-chart { margin-top: 1.5rem; }
+.opinion-answer-picker { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1rem 0; }
+.opinion-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+.opinion-metrics > div { padding: 1rem; background: var(--accent-soft); border-radius: 10px; }
+.opinion-metrics span { display: block; color: var(--muted); font-size: .85rem; }
+.opinion-metrics strong { display: block; font-size: clamp(1.3rem, 3vw, 2rem); overflow-wrap: anywhere; }
+.opinion-interpretation { font-weight: 600; max-width: 80ch; }
+.opinion-canvas-wrap { position: relative; height: 360px; width: 100%; margin: 1.5rem 0 .5rem; }
+.opinion-chart details { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.opinion-chart details summary { font-weight: 600; margin-bottom: .75rem; }
+.opinion-table-scroll { max-width: 100%; overflow-x: auto; }
+.opinion-data table { border-collapse: collapse; width: 100%; text-align: left; font-size: .85rem; }
+.opinion-data th, .opinion-data td { padding: .6rem; border-bottom: 1px solid var(--line); }
+.opinion-data caption { text-align: left; padding: .5rem; color: var(--muted); }
+@media (max-width: 600px) {
+    .opinion-metrics { grid-template-columns: 1fr; gap: .5rem; }
+    .opinion-metrics > div { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+    .opinion-metrics span { max-width: 65%; }
+    .opinion-canvas-wrap { height: 320px; }
+}

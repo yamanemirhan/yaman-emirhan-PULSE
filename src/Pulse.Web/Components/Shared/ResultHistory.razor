@@ -43,7 +43,7 @@
 
                 <p class="history-timestamp">
                     First prepared:
-                    @item.ServedAtUtc.ToString("yyyy-MM-dd HH:mm:ss") UTC
+                    <LocalTime Utc="@item.ServedAtUtc" />
                 </p>
 
                 <div class="replay-grid">

@@ -1,0 +1,103 @@
+@page "/room"
+@rendermode InteractiveServer
+@implements IDisposable
+@using Pulse.Web.Services
+@using Pulse.Web.Components.Shared
+@inject RoomService Rooms
+@inject ILogger<Room> Logger
+
+<PageTitle>Room · PULSE</PageTitle>
+<header class="question-list-heading">
+    <div><p class="eyebrow">One question, together</p><h1>The Room</h1>
+        <p class="muted">A shared view of the group's latest answers.</p></div>
+    <span class="subtle-tag">Auto-refresh · every 2 seconds</span>
+</header>
+@if (_error is not null)
+{
+    <p class="notice notice-error" role="alert">@_error</p>
+}
+@if (_loading)
+{
+    <p role="status" class="muted">Loading the Room…</p>
+}
+else if (_current is null && _error is null)
+{
+    <section class="card empty-state"><h2>No featured question yet</h2>
+        <p class="muted">An Administrator can feature a question from its question page.</p>
+        <a class="button button-outline" href="/questions">Browse questions</a></section>
+}
+else if (_current is { } room)
+{
+    <section class="card room-question" aria-labelledby="featured-title">
+        <p class="eyebrow">Featured question</p><h2 id="featured-title">@room.QuestionText</h2>
+        <p class="question-meta">Featured <LocalTime Utc="@room.FeaturedAtUtc" /></p>
+        <a class="button button-primary" href="@($"/questions/{room.QuestionId}")">Vote and view evidence →</a>
+    </section>
+    <ResultPanel QuestionId="@room.QuestionId" Revision="@_resultRevision" @key="room.QuestionId" />
+    <OpinionChart QuestionId="@room.QuestionId" Revision="@_resultRevision" @key="(room.QuestionId, nameof(OpinionChart))" />
+    <p class="field-help room-note">The same question is featured for everyone. Vote on its question page; this Room updates automatically while connected.</p>
+}
+
+@code {
+    private readonly CancellationTokenSource _stop = new();
+    private RoomState? _current;
+    private bool _loading = true, _refreshing, _disposed;
+    private string? _error;
+    private int _resultRevision;
+
+    protected override Task OnInitializedAsync() => RefreshAsync();
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Start only on an interactive circuit, not during prerendering.
+        if (firstRender) _ = PollAsync(_stop.Token);
+        return Task.CompletedTask;
+    }
+
+    private async Task PollAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+                await InvokeAsync(async () =>
+                {
+                    await RefreshAsync();
+                    if (!_disposed) StateHasChanged();
+                });
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (ObjectDisposedException) when (_disposed) { }
+    }
+
+    private async Task RefreshAsync()
+    {
+        if (_disposed || _refreshing) return;
+        _refreshing = true;
+        try
+        {
+            var room = await Rooms.GetAsync(_stop.Token);
+            if (_disposed) return;
+            if (room != _current || _error is not null)
+            {
+                _current = room;
+                _resultRevision++;
+            }
+            _error = null;
+        }
+        catch (OperationCanceledException) when (_stop.IsCancellationRequested) { }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Room refresh failed.");
+            _error = "Updates are temporarily unavailable; retrying automatically. The last loaded question and results may be out of date.";
+        }
+        finally { _refreshing = false; _loading = false; }
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        _stop.Cancel();
+        _stop.Dispose();
+    }
+}
