@@ -1,0 +1,133 @@
+@page "/questions"
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using System.Globalization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Pulse.Web.Domain
+@using Pulse.Web.Services
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject QuestionService QuestionService
+@inject ILogger<Questions> Logger
+
+<PageTitle>@(_canBrowseAll ? "All questions" : "My questions") · PULSE</PageTitle>
+<header class="question-list-heading">
+    <div>
+        <p class="eyebrow">Your conversations</p>
+        <h1>@(_canBrowseAll ? "All questions" : "My questions")</h1>
+        <p class="muted">@(_canBrowseAll
+            ? "Browse questions across the application, newest first."
+            : "Questions you created with this browser identity, newest first.")</p>
+    </div>
+    <a class="button button-primary" href="/">Ask a question <span aria-hidden="true">↗</span></a>
+</header>
+
+@if (_loading)
+{
+    <p class="muted" role="status">Loading questions…</p>
+}
+else if (_error is not null)
+{
+    <p class="notice notice-error" role="alert">@_error</p>
+    <a class="back-link" href="/questions">Back to newest questions</a>
+}
+else if (_page is not null)
+{
+    @if (_page.Items.Count == 0)
+    {
+        <section class="card empty-state">
+            <h2>@(BeforeSequence is not null ? "No questions on this page" : "No questions yet")</h2>
+            <p class="muted">@(BeforeSequence is not null
+                ? "Return to the newest questions to start browsing again."
+                : "Start a conversation and share its link with your group.")</p>
+            <a class="button button-outline" href="@(BeforeSequence is not null ? "/questions" : "/")">
+                @(BeforeSequence is not null ? "Newest questions" : "Create your first question")
+            </a>
+        </section>
+    }
+    else
+    {
+        <ul class="question-list" aria-label="Questions">
+            @foreach (var question in _page.Items)
+            {
+                <li class="card question-list-item" @key="question.Id">
+                    <div>
+                        <h2><a href="@($"/questions/{question.Id}")">@question.Text</a></h2>
+                        <p class="question-meta">Created @question.CreatedAtUtc.ToString("dd MMM yyyy · HH:mm", CultureInfo.InvariantCulture) UTC</p>
+                    </div>
+                    <span class="question-list-arrow" aria-hidden="true">↗</span>
+                </li>
+            }
+        </ul>
+    }
+
+    @if (BeforeSequence is not null || _page.NextBeforeSequence is not null)
+    {
+        <nav class="question-pagination" aria-label="Question list pages">
+            @if (BeforeSequence is not null)
+            {
+                <a class="button button-outline" href="/questions">← Newest questions</a>
+            }
+            @if (_page.NextBeforeSequence is { } next)
+            {
+                <a class="button button-outline" href="@($"/questions?before={next}")">Older questions →</a>
+            }
+        </nav>
+    }
+
+    @if (!_canBrowseAll)
+    {
+        <p class="field-help">Questions shared with you still open through their links. Clearing cookies or using another browser changes which questions appear here.</p>
+    }
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "before")]
+    public long? BeforeSequence { get; set; }
+
+    private QuestionListPage? _page;
+    private bool _canBrowseAll;
+    private bool _loading = true;
+    private string? _error;
+    private int _loadVersion;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var version = ++_loadVersion;
+        _loading = true;
+        _error = null;
+        _page = null;
+
+        try
+        {
+            var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var page = await QuestionService.ListAsync(state.User, BeforeSequence);
+            if (version != _loadVersion)
+                return;
+
+            _canBrowseAll = state.User.IsInRole(nameof(PulseRole.Moderator)) ||
+                state.User.IsInRole(nameof(PulseRole.Administrator));
+            _page = page;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            if (version == _loadVersion)
+                _error = "Please reload the page to restore your identity.";
+        }
+        catch (ValidationException ex)
+        {
+            if (version == _loadVersion)
+                _error = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Question list could not be loaded.");
+            if (version == _loadVersion)
+                _error = "Could not load questions. Please try again.";
+        }
+        finally
+        {
+            if (version == _loadVersion)
+                _loading = false;
+        }
+    }
+}

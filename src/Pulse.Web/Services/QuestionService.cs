@@ -8,6 +8,7 @@ using System.Text.Json;
 namespace Pulse.Web.Services
 {
     public sealed record QuestionDetails(Guid Id, string Text, DateTime CreatedAtUtc);
+    public sealed record QuestionListPage(IReadOnlyList<QuestionDetails> Items, long? NextBeforeSequence);
 
     public sealed class QuestionService(EventStore eventStore, IDbContextFactory<PulseDbContext> dbFactory)
     {
@@ -67,6 +68,48 @@ namespace Pulse.Web.Services
             if (created is null)
                 return null;
 
+            return ReadDetails(created);
+        }
+
+        public async Task<QuestionListPage> ListAsync(
+            ClaimsPrincipal user, long? beforeSequence = null)
+        {
+            if (user.Identity?.IsAuthenticated != true ||
+                !Guid.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var actorId) ||
+                actorId == Guid.Empty ||
+                !Enum.TryParse<PulseRole>(user.FindFirstValue(ClaimTypes.Role), out var role) ||
+                !Enum.IsDefined(role))
+                throw new UnauthorizedAccessException();
+
+            if (beforeSequence is <= 0)
+                throw new ValidationException("Invalid question list page.");
+
+            await using var db = await dbFactory.CreateDbContextAsync();
+            var query = db.Events.AsNoTracking()
+                .Where(e => e.Kind == PulseEventKind.QuestionCreated);
+
+            // Scope the database query itself; never fetch other people's questions
+            // and rely on the browser to hide them.
+            if (role == PulseRole.Participant)
+                query = query.Where(e => e.ActorId == actorId);
+
+            if (beforeSequence is { } boundary)
+                query = query.Where(e => e.Sequence < boundary);
+
+            const int pageSize = 20;
+            var events = await query.OrderByDescending(e => e.Sequence)
+                .Take(pageSize + 1)
+                .ToListAsync();
+
+            var hasMore = events.Count > pageSize;
+            var page = events.Take(pageSize).ToList();
+            return new QuestionListPage(
+                page.Select(ReadDetails).ToArray(),
+                hasMore ? page[^1].Sequence : null);
+        }
+
+        private static QuestionDetails ReadDetails(PulseEvent created)
+        {
             if (created.PayloadVersion != 1)
                 throw new NotSupportedException("Unsupported question payload.");
 
@@ -76,7 +119,7 @@ namespace Pulse.Web.Services
                 ?? throw new InvalidOperationException("Invalid question payload.");
 
             return new QuestionDetails(
-                questionId,
+                created.QuestionId,
                 payload.Text,
                 created.RecordedAtUtc);
         }
