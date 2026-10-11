@@ -3,6 +3,7 @@
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Components.Authorization
 @using Pulse.Web.Services
+@using Pulse.Web.Components.Shared
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject QuestionService Questions
 @inject NavigationManager Navigation
@@ -39,6 +40,8 @@
         <p class="form-footnote">You’ll get a link to share. No account needed.</p>
     </section>
 </div>
+
+<EventChainPanel />
 
 @code {
     private string _text = string.Empty;

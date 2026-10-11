@@ -40,9 +40,14 @@
         <div class="range-labels" aria-hidden="true"><span>0 · Not confident</span><span>100 · Very confident</span></div>
         <p id="confidence-help" class="field-help">Drag the slider or type a whole number from 0 to 100.</p>
         <p id="confidence-error" class="field-error" aria-live="polite">@(!ConfidenceIsValid ? "Enter a whole number between 0 and 100." : null)</p>
-        <button class="button button-primary button-full" type="button" @onclick="SaveAsync" disabled="@(!ConfidenceIsValid)">
+        <button class="button button-primary button-full" type="button" @onclick="SaveAsync" disabled="@(!ConfidenceIsValid || !HasChanges)" aria-describedby="vote-change-hint">
             @(_busy ? "Please wait…" : _saved is null ? "Save my vote" : "Update my vote") <span aria-hidden="true">→</span>
         </button>
+        <p id="vote-change-hint" class="field-help" aria-live="polite">
+            @(_saved is not null && ConfidenceIsValid && !HasChanges
+                ? "Your vote is up to date. Change your answer or confidence to update it."
+                : null)
+        </p>
     </fieldset>
     @if (_message is not null)
     {
@@ -116,6 +121,9 @@
             return;
         }
 
+        if (!HasChanges)
+            return;
+
         _busy = true;
         _error = null;
         _message = null;
@@ -135,11 +143,24 @@
             var state =
                 await AuthenticationStateProvider.GetAuthenticationStateAsync();
 
-            await Votes.CastAsync(
+            var result = await Votes.CastAsync(
                 state.User, QuestionId, _requestId, answer, confidence);
 
             _saved = new VoteCastPayload(answer, confidence);
-            _message = "Vote saved.";
+            _message = result.IsUnchanged
+                ? "Your vote was already up to date. No new event was recorded."
+                : "Vote saved.";
+
+            if (result.IsDuplicate)
+            {
+                // A retry of an older request must not display it as the latest vote.
+                _saved = await Votes.GetLatestAsync(state.User, QuestionId)
+                    ?? throw new InvalidOperationException("The recorded vote could not be loaded.");
+                _answer = _saved.Answer;
+                _confidence = _saved.Confidence;
+                _confidenceText = _confidence.ToString(CultureInfo.InvariantCulture);
+                _message = "This request was already processed. Your latest vote is shown.";
+            }
 
             // The operation succeeded. A later submission is a new operation.
             _attemptKey = null;
@@ -165,6 +186,10 @@
         }
     }
     private bool ConfidenceIsValid => TryGetConfidence(out _);
+
+    private bool HasChanges => _saved is null ||
+        (TryGetConfidence(out var confidence) &&
+         (_answer != _saved.Answer || confidence != _saved.Confidence));
 
     private bool TryGetConfidence(out int value) =>
         int.TryParse(_confidenceText, NumberStyles.Integer, CultureInfo.InvariantCulture, out value)

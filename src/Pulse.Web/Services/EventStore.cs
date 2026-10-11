@@ -2,10 +2,11 @@
 using Microsoft.EntityFrameworkCore;
 using Pulse.Web.Data;
 using Pulse.Web.Domain;
+using System.Text.Json;
 
 namespace Pulse.Web.Services
 {
-    public sealed record AppendResult(long Sequence, bool IsDuplicate);
+    public sealed record AppendResult(long Sequence, bool IsDuplicate, bool IsUnchanged = false);
 
     public sealed class EventStore(IDbContextFactory<PulseDbContext> dbFactory, TimeProvider timeProvider)
     {
@@ -50,6 +51,26 @@ namespace Pulse.Web.Services
                 return new AppendResult(existing.Sequence, IsDuplicate: true);
             }
 
+            // Compare against the latest vote while holding SQLite's write lock.
+            // A UI-only check would allow two concurrent submissions to append the same vote.
+            if (draft.Kind == PulseEventKind.VoteCast)
+            {
+                var incomingVote = ReadVote(draft.PayloadVersion, draft.PayloadJson);
+                var latestVote = await db.Events
+                    .AsNoTracking()
+                    .Where(e => e.QuestionId == draft.QuestionId &&
+                                e.ActorId == draft.ActorId &&
+                                e.Kind == PulseEventKind.VoteCast)
+                    .OrderByDescending(e => e.Sequence)
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                if (latestVote is not null &&
+                    ReadVote(latestVote.PayloadVersion, latestVote.PayloadJson) == incomingVote)
+                {
+                    return new AppendResult(latestVote.Sequence, IsDuplicate: false, IsUnchanged: true);
+                }
+            }
+
             // get the hash of the previous event, or use the genesis hash if there are no previous events  
             var previousHash = await db.Events
                 .OrderByDescending(e => e.Sequence)
@@ -92,6 +113,20 @@ namespace Pulse.Web.Services
             await transaction.CommitAsync(cancellationToken);
 
             return new AppendResult(pulseEvent.Sequence, IsDuplicate: false);
+        }
+
+        private static VoteCastPayload ReadVote(int version, string json)
+        {
+            if (version != 1)
+                throw new NotSupportedException("Unsupported vote payload.");
+
+            var vote = JsonSerializer.Deserialize<VoteCastPayload>(json)
+                ?? throw new InvalidOperationException("Invalid vote payload.");
+
+            if (!Enum.IsDefined(vote.Answer) || vote.Confidence is < 0 or > 100)
+                throw new InvalidOperationException("Invalid vote payload.");
+
+            return vote;
         }
     }
 }

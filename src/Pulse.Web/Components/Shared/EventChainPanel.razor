@@ -1,0 +1,87 @@
+@using Pulse.Web.Domain
+@using Pulse.Web.Services
+@inject EventChainVerifier Verifier
+@inject ILogger<EventChainPanel> Logger
+
+<details class="history-panel">
+    <summary class="history-heading">
+        <span><span class="eyebrow">Behind the history</span><span class="history-title">Event chain integrity</span></span>
+        <span class="details-chevron" aria-hidden="true">+</span>
+    </summary>
+    <div class="history-body">
+        <p class="muted">
+            All questions share one event chain. This check recalculates each event's hash
+            and checks its link to the previous event. It does not recalculate voting results.
+        </p>
+
+        <button class="button button-outline" type="button" @onclick="VerifyAsync" disabled="@_busy">
+            @(_busy ? "Verifying…" : "Verify event chain")
+        </button>
+
+        <div role="status" aria-live="polite" aria-atomic="true">
+            @if (_error is not null)
+            {
+                <p class="notice notice-error">@_error</p>
+            }
+            else if (_verification is { } result)
+            {
+                @if (!result.IsValid)
+                {
+                    <p class="notice notice-error">
+                        Verification stopped at event <strong>@result.ProblemSequence</strong>.
+                        @result.Problem
+                        Checked @result.CheckedEvents event(s); later events were not checked.
+                    </p>
+                }
+                else if (result.CheckedEvents == 0)
+                {
+                    <p class="notice">No events to verify yet.</p>
+                }
+                else
+                {
+                    <p class="notice notice-success">
+                        No inconsistencies detected in @result.CheckedEvents event(s),
+                        through event <strong>@result.LastVerifiedSequence</strong>.
+                    </p>
+                }
+            }
+        </div>
+
+        <p class="field-help">
+            Checks the history available when the scan starts. Run it again after new activity.
+            Without an independently stored checkpoint, this cannot detect deletion of the
+            chain's final events or a complete rewrite with recalculated hashes.
+            Passing this check does not prove that the recorded claims are true.
+        </p>
+    </div>
+</details>
+
+@code {
+    private EventChainVerification? _verification;
+    private bool _busy;
+    private string? _error;
+
+    private async Task VerifyAsync()
+    {
+        if (_busy)
+            return;
+
+        _busy = true;
+        _error = null;
+        _verification = null;
+
+        try
+        {
+            _verification = await Verifier.VerifyAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Event chain verification failed.");
+            _error = "Could not verify the event chain. No records were changed. Please try again.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

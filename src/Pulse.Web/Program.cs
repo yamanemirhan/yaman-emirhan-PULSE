@@ -18,6 +18,7 @@ builder.Services.AddDbContextFactory<PulseDbContext>(options => options.UseSqlit
 
 builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 builder.Services.AddScoped<EventStore>();
+builder.Services.AddScoped<EventChainVerifier>();
 
 builder.Services
     .AddAuthentication(ParticipantIdentityMiddleware.Scheme)

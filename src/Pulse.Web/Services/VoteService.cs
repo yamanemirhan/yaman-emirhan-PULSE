@@ -9,7 +9,7 @@ namespace Pulse.Web.Services
 {
     public sealed class VoteService(EventStore eventStore, QuestionService questions, IDbContextFactory<PulseDbContext> dbFactory)
     {
-        public async Task CastAsync(
+        public async Task<AppendResult> CastAsync(
             ClaimsPrincipal user,
             Guid questionId,
             Guid requestId,
@@ -30,7 +30,7 @@ namespace Pulse.Web.Services
             var payload = JsonSerializer.Serialize(
                 new VoteCastPayload(answer, confidence));
 
-            await eventStore.AppendAsync(new NewEvent(
+            return await eventStore.AppendAsync(new NewEvent(
                 questionId,
                 PulseEventKind.VoteCast,
                 actor.Id,
