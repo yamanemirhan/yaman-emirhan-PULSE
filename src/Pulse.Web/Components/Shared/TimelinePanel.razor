@@ -1,0 +1,120 @@
+@using System.Globalization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Pulse.Web.Domain
+@using Pulse.Web.Services
+@inject TimelineService Timeline
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ILogger<TimelinePanel> Logger
+
+<section class="timeline-section" aria-labelledby="timeline-title">
+    <header class="question-list-heading">
+        <div><p class="eyebrow">How views evolved</p><h2 id="timeline-title">Question timeline</h2>
+            <p class="muted">Votes and evidence in recorded order, newest first. Times are UTC.</p></div>
+        <button type="button" class="button button-outline" @onclick="LoadAsync" disabled="@_loading">Refresh timeline</button>
+    </header>
+    <p class="field-help">Results are reconstructed after each vote. Available evidence does not prove someone read it or changed their mind because of it.</p>
+    @if (_error is not null)
+    {
+        <p class="notice notice-error" role="alert">@_error</p>
+    }
+    else if (_loading)
+    {
+        <p role="status" class="muted">Loading timeline…</p>
+    }
+    else if (_items.Count == 0)
+    {
+        <p class="empty-state compact muted">No activity is available to you yet.</p>
+    }
+    else
+    {
+        <ol class="timeline-list">
+            @foreach (var item in _items.Take(_visibleCount))
+            {
+                <li class="card timeline-item" @key="item.Sequence">
+                    <p class="question-meta"><time datetime="@item.RecordedAtUtc.ToString("O")">@item.RecordedAtUtc.ToString("dd MMM yyyy · HH:mm:ss", CultureInfo.InvariantCulture) UTC</time></p>
+                    <h3>@item.Title</h3>
+                    <p class="timeline-description">@item.Description</p>
+                    @if (item.Result is { } result)
+                    {
+                        <div class="timeline-result" aria-label="Reconstructed group result">
+                            @foreach (var answer in result.Answers)
+                            {
+                                <div><strong>@answer.Answer</strong> @Format(answer.Percentage)% <span class="muted">(@answer.Count)</span>
+                                    <div class="field-help">Avg. confidence @Format(answer.AverageConfidence)</div></div>
+                            }
+                        </div>
+                        <p class="field-help">@result.ParticipantCount participant(s) · @result.ChangedAnswerCount changed their answer</p>
+                        <details class="timeline-sources"><summary>Group-visible evidence at this point (@item.Sources.Count)</summary>
+                            @if (item.Sources.Count == 0)
+                            {
+                                <p class="muted">No approved evidence was available to the group yet.</p>
+                            }
+                            else
+                            {
+                                @Sources(item.Sources)
+                            }
+                        </details>
+                    }
+                    else
+                    {
+                        @Sources(item.Sources)
+                    }
+                </li>
+            }
+        </ol>
+        @if (_visibleCount < _items.Count)
+        {
+            <button class="button button-outline" type="button" @onclick="ShowOlder">Show older activity</button>
+        }
+        <p class="field-help">Only your individual vote details are shown. Pending or rejected source content is restricted to its submitter and staff; previously public activity may appear with its source hidden.</p>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public Guid QuestionId { get; set; }
+    [Parameter] public int Revision { get; set; }
+    private IReadOnlyList<TimelineEntry> _items = Array.Empty<TimelineEntry>();
+    private bool _loading;
+    private string? _error;
+    private int _visibleCount = 20;
+    private Guid _loadedQuestion;
+    private int _loadedRevision = -1;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedQuestion == QuestionId && _loadedRevision == Revision) return;
+        if (_loadedQuestion != QuestionId) _visibleCount = 20;
+        _loadedQuestion = QuestionId;
+        _loadedRevision = Revision;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            _items = await Timeline.GetAsync(state.User, QuestionId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not load timeline for {QuestionId}", QuestionId);
+            _items = Array.Empty<TimelineEntry>();
+            _error = "Could not load the timeline. Please refresh or reload the page.";
+        }
+        finally { _loading = false; }
+    }
+
+    private void ShowOlder() => _visibleCount += 20;
+    private static string Format(decimal? value) => value?.ToString("0.#", CultureInfo.InvariantCulture) ?? "—";
+    private RenderFragment Sources(IReadOnlyList<TimelineSource> sources) => @<ul class="timeline-source-list">
+        @foreach (var source in sources)
+        {
+            <li>@if (source.Url is { } url)
+                { <a href="@url" target="_blank" rel="noopener noreferrer">@source.Title ↗</a> }
+                else { <span class="muted">@source.Title</span> }</li>
+        }
+    </ul>;
+}

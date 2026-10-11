@@ -44,6 +44,8 @@ else
         <ResultPanel QuestionId="@Id" Revision="@_resultRevision" />
     </div>
     <ResultHistory QuestionId="@Id" @key="(Id, nameof(ResultHistory))" />
+    <EvidencePanel QuestionId="@Id" @key="(Id, nameof(EvidencePanel))" OnChanged="RefreshResults" />
+    <TimelinePanel QuestionId="@Id" Revision="@_resultRevision" @key="(Id, nameof(TimelinePanel))" />
 }
 
 @code {

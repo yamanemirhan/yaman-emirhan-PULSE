@@ -1,0 +1,64 @@
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Authorization
+@using Pulse.Web.Domain
+@using Pulse.Web.Services
+@inject EvidenceService Evidence
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ILogger<EvidenceReviewForm> Logger
+
+<div class="evidence-review">
+    <fieldset class="vote-fields" disabled="@_busy">
+        <legend class="field-label">Moderator review</legend>
+        <label class="field-label" for="@($"reason-{Item.Id}")">Reason for your decision</label>
+        <textarea id="@($"reason-{Item.Id}")" @bind="_reason" @bind:event="oninput" maxlength="500" rows="2"></textarea>
+        <div class="review-actions">
+            <button class="button button-primary" type="button" @onclick="() => ReviewAsync(EvidenceStatus.Approved)" disabled="@(!CanSubmit(EvidenceStatus.Approved))">Approve</button>
+            <button class="button button-outline" type="button" @onclick="() => ReviewAsync(EvidenceStatus.Rejected)" disabled="@(!CanSubmit(EvidenceStatus.Rejected))">Reject</button>
+        </div>
+    </fieldset>
+    @if (_error is not null) { <p class="notice notice-error" role="alert">@_error</p> }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Guid QuestionId { get; set; }
+    [Parameter, EditorRequired] public EvidenceDetails Item { get; set; } = default!;
+    [Parameter] public EventCallback OnReviewed { get; set; }
+    private string _reason = "";
+    private string? _error;
+    private EvidenceReviewedPayload? _attempt;
+    private Guid _requestId;
+    private bool _busy;
+
+    protected override void OnInitialized() => _reason = Item.ReviewReason ?? "";
+
+    private bool CanSubmit(EvidenceStatus status) => !string.IsNullOrWhiteSpace(_reason) &&
+        (_reason.Trim() != Item.ReviewReason || status != Item.Status);
+
+    private async Task ReviewAsync(EvidenceStatus status)
+    {
+        if (_busy || !CanSubmit(status)) return;
+        _busy = true;
+        _error = null;
+        try
+        {
+            var payload = new EvidenceReviewedPayload(Item.Id, status, _reason.Trim(), Item.LastChangeSequence);
+            if (_attempt != payload)
+            {
+                _attempt = payload;
+                _requestId = Guid.NewGuid();
+            }
+            var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            await Evidence.ReviewAsync(state.User, QuestionId, Item.Id, _requestId,
+                payload.ExpectedSequence, payload.Status, payload.Reason);
+            await OnReviewed.InvokeAsync();
+        }
+        catch (ValidationException ex) { _error = ex.Message; }
+        catch (UnauthorizedAccessException) { _error = "Only Moderator can review evidence."; }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Evidence review failed.");
+            _error = "Could not record the review. Please try again.";
+        }
+        finally { _busy = false; }
+    }
+}

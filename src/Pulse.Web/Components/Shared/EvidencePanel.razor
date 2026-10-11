@@ -1,0 +1,161 @@
+@using System.ComponentModel.DataAnnotations
+@using System.Globalization
+@using System.Security.Claims
+@using System.Text.Json
+@using Microsoft.AspNetCore.Components.Authorization
+@using Pulse.Web.Domain
+@using Pulse.Web.Services
+@inject EvidenceService Evidence
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ILogger<EvidencePanel> Logger
+
+<section class="evidence-section" aria-labelledby="evidence-title">
+    <header class="question-list-heading">
+        <div><p class="eyebrow">Information behind the views</p><h2 id="evidence-title">Evidence</h2>
+            <p class="muted">Share a source and explain how it relates to this question. Evidence can be added after voting begins.</p></div>
+        <button class="button button-outline" type="button" @onclick="RefreshAsync" disabled="@(_busy || _loading)">Refresh evidence</button>
+    </header>
+
+    @if (_error is not null)
+    {
+        <p class="notice notice-error" role="alert">@_error</p>
+    }
+    @if (_message is not null)
+    {
+        <p class="notice notice-success" role="status">@_message</p>
+    }
+
+    <details class="history-panel evidence-submit">
+        <summary class="history-heading"><span class="history-title">Add evidence</span><span class="details-chevron" aria-hidden="true">+</span></summary>
+        <form class="history-body" @onsubmit="SubmitAsync" @onsubmit:preventDefault="true">
+            <fieldset class="vote-fields" disabled="@(_busy || _loading)">
+                <legend class="sr-only">Submit evidence for review</legend>
+                <label class="field-label" for="evidence-title-input">Title</label>
+                <input id="evidence-title-input" @bind="_title" @bind:event="oninput" maxlength="200" required />
+                <label class="field-label" for="evidence-url">Source link</label>
+                <input id="evidence-url" type="url" @bind="_url" @bind:event="oninput" maxlength="2048" placeholder="https://example.org/source" required />
+                <label class="field-label" for="evidence-summary">Summary and relevance</label>
+                <textarea id="evidence-summary" @bind="_summary" @bind:event="oninput" maxlength="2000" rows="3" required></textarea>
+                <p class="field-help">Your title, link and summary will be preserved. Until approved, only you, Moderators and Administrators can see this submission.</p>
+                <button class="button button-primary" type="submit">@(_busy ? "Submitting…" : "Submit evidence")</button>
+            </fieldset>
+        </form>
+    </details>
+
+    @if (_loading)
+    {
+        <p class="muted" role="status">Loading evidence…</p>
+    }
+    else if (_items.Count == 0 && _error is null)
+    {
+        <p class="empty-state compact muted">No evidence is available to you yet.</p>
+    }
+    else
+    {
+        <div class="evidence-list">
+            @foreach (var item in _items)
+            {
+                <article class="card evidence-item" @key="item.Id">
+                    <div class="card-heading"><span class="eyebrow">Source</span>
+                        <span class="status-badge @(item.Status == EvidenceStatus.Approved ? "status-match" : item.Status == EvidenceStatus.Rejected ? "status-mismatch" : "status-pending")">@item.Status</span></div>
+                    <h3><a href="@item.Url" target="_blank" rel="noopener noreferrer">@item.Title <span aria-hidden="true">↗</span></a></h3>
+                    <p class="evidence-summary">@item.Summary</p>
+                    <p class="question-meta">Submitted @FormatTime(item.SubmittedAtUtc) UTC</p>
+                    @if (item.ReviewedAtUtc is { } reviewedAt)
+                    {
+                        <div class="evidence-decision"><strong>Latest review: @item.Status</strong>
+                            <p>@item.ReviewReason</p><span class="question-meta">@FormatTime(reviewedAt) UTC</span></div>
+                    }
+                    @if (_canReview && item.SubmittedBy != _viewerId)
+                    {
+                        <EvidenceReviewForm QuestionId="QuestionId" Item="item" OnReviewed="AfterReviewAsync" @key="(item.Id, item.LastChangeSequence)" />
+                    }
+                    else if (_canReview)
+                    {
+                        <p class="field-help">You cannot review your own evidence. Another Moderator must review it.</p>
+                    }
+                </article>
+            }
+        </div>
+    }
+    <p class="field-help">Approval means a Moderator accepted the source for display, not that its claims are proven. External pages may change; the submitted summary is retained.</p>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public Guid QuestionId { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private IReadOnlyList<EvidenceDetails> _items = Array.Empty<EvidenceDetails>();
+    private string _title = "", _url = "", _summary = "";
+    private string? _attemptKey, _error, _message;
+    private Guid _evidenceId, _requestId;
+    private Guid _viewerId;
+    private bool _busy, _loading, _canReview;
+
+    protected override Task OnInitializedAsync() => RefreshAsync();
+
+    private async Task RefreshAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            _items = await Evidence.ListAsync(state.User, QuestionId);
+            _viewerId = Guid.Parse(state.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            _canReview = state.User.IsInRole(nameof(PulseRole.Moderator));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Evidence could not be loaded.");
+            _items = Array.Empty<EvidenceDetails>();
+            _error = "Could not load evidence. Please refresh or reload the page.";
+        }
+        finally { _loading = false; }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (_busy || _loading) return;
+        _busy = true;
+        _error = null;
+        _message = null;
+        try
+        {
+            var title = _title.Trim();
+            var url = _url.Trim();
+            var summary = _summary.Trim();
+            var key = JsonSerializer.Serialize(new { title, url, summary });
+            if (_attemptKey != key)
+            {
+                _attemptKey = key;
+                _evidenceId = Guid.NewGuid();
+                _requestId = Guid.NewGuid();
+            }
+            var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            await Evidence.SubmitAsync(state.User, QuestionId, _evidenceId, _requestId, title, url, summary);
+            _title = _url = _summary = "";
+            _attemptKey = null;
+            _message = "Evidence submitted. It is pending Moderator review.";
+            await RefreshAsync();
+            await OnChanged.InvokeAsync();
+        }
+        catch (ValidationException ex) { _error = ex.Message; }
+        catch (UnauthorizedAccessException) { _error = "Please reload the page to restore your identity."; }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Evidence submission failed.");
+            _error = "Could not submit evidence. Please try again.";
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task AfterReviewAsync()
+    {
+        _message = "Review recorded. Earlier decisions remain in the history.";
+        await RefreshAsync();
+        await OnChanged.InvokeAsync();
+    }
+
+    private static string FormatTime(DateTime time) => time.ToString("dd MMM yyyy · HH:mm:ss", CultureInfo.InvariantCulture);
+}

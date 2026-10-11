@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Pulse.Web.Data;
 using Pulse.Web.Domain;
 using System.Text.Json;
+using System.ComponentModel.DataAnnotations;
 
 namespace Pulse.Web.Services
 {
@@ -68,6 +69,39 @@ namespace Pulse.Web.Services
                     ReadVote(latestVote.PayloadVersion, latestVote.PayloadJson) == incomingVote)
                 {
                     return new AppendResult(latestVote.Sequence, IsDuplicate: false, IsUnchanged: true);
+                }
+            }
+
+            if (draft.Kind is PulseEventKind.EvidenceSubmitted or PulseEventKind.EvidenceReviewed)
+            {
+                // Review preconditions must be checked under the same write lock as the append.
+                var history = await db.Events.AsNoTracking()
+                    .Where(e => e.QuestionId == draft.QuestionId &&
+                        (e.Kind == PulseEventKind.EvidenceSubmitted || e.Kind == PulseEventKind.EvidenceReviewed))
+                    .OrderBy(e => e.Sequence).ToListAsync(cancellationToken);
+                var evidence = EvidenceHistory.Replay(draft.QuestionId, history);
+
+                if (draft.Kind == PulseEventKind.EvidenceSubmitted)
+                {
+                    var payload = EvidenceHistory.Read<EvidenceSubmittedPayload>(draft.PayloadVersion, draft.PayloadJson);
+                    EvidenceHistory.Validate(payload);
+                    if (evidence.Any(e => e.Id == payload.EvidenceId))
+                        throw new ValidationException("This evidence ID has already been submitted.");
+                }
+                else
+                {
+                    if (draft.ActorRole != PulseRole.Moderator)
+                        throw new UnauthorizedAccessException("Only Moderator can review evidence.");
+                    var payload = EvidenceHistory.Read<EvidenceReviewedPayload>(draft.PayloadVersion, draft.PayloadJson);
+                    EvidenceHistory.Validate(payload);
+                    var current = evidence.SingleOrDefault(e => e.Id == payload.EvidenceId)
+                        ?? throw new ValidationException("Evidence not found for this question.");
+                    if (current.SubmittedBy == draft.ActorId)
+                        throw new ValidationException("You cannot review your own evidence. Another Moderator must review it.");
+                    if (current.LastChangeSequence != payload.ExpectedSequence)
+                        throw new ValidationException("This evidence was reviewed by another request. Refresh evidence before deciding again.");
+                    if (current.Status == payload.Status && current.ReviewReason == payload.Reason)
+                        return new AppendResult(current.LastChangeSequence, IsDuplicate: false, IsUnchanged: true);
                 }
             }
 

@@ -238,6 +238,23 @@ pre { margin: 0; padding: 16px; border-radius: 8px; background: #f2f4ed; color: 
 .question-list-item .question-meta { margin-bottom: 0; }
 .question-list-arrow { flex-shrink: 0; color: var(--accent); font-size: 1.3rem; }
 .question-pagination { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; margin-top: 24px; }
+.evidence-section { margin-top: 38px; padding-top: 30px; border-top: 1px solid var(--line); }
+.evidence-section .question-list-heading { margin-bottom: 12px; }
+.evidence-submit { margin: 20px 0; }
+.evidence-submit .vote-fields { margin-top: 0; }
+.evidence-submit .field-label:not(:first-of-type) { margin-top: 16px; }
+.evidence-submit .button { margin-top: 16px; }
+.evidence-list { display: grid; gap: 18px; margin-top: 20px; }
+.evidence-item h3 { font-size: 1.15rem; line-height: 1.5; overflow-wrap: anywhere; }
+.evidence-item .card-heading { margin-bottom: 12px; }
+.evidence-summary, .evidence-decision p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.evidence-summary { font-size: .9rem; }
+.evidence-decision { padding: 14px 18px; background: var(--accent-soft); border-radius: 9px; font-size: .8rem; }
+.evidence-decision p { margin: 6px 0; }
+.evidence-review { border-top: 1px solid var(--line); margin-top: 20px; }
+.evidence-review textarea { min-height: 90px; }
+.review-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+.status-pending { background: #fbf1d5; color: #7a5a11; }
 .role-bar .eyebrow { margin-bottom: 3px; }
 .role-bar strong { font-size: .85rem; }
 .role-bar p { margin: 3px 0 0; font-size: .73rem; color: var(--muted); }
@@ -251,3 +268,13 @@ pre { margin: 0; padding: 16px; border-radius: 8px; background: #f2f4ed; color: 
     .role-form select { flex: 1; }
     .site-header { flex-wrap: wrap; padding: 16px 0; gap: 12px; }
 }
+.timeline-section { margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--line); }
+.timeline-list { list-style: none; padding: 0; display: grid; gap: 1rem; }
+.timeline-item { border-left: 3px solid var(--accent, #285c4b); }
+.timeline-item h3 { margin: .4rem 0 .6rem; }
+.timeline-description { white-space: pre-wrap; overflow-wrap: anywhere; }
+.timeline-result { display: flex; flex-wrap: wrap; gap: .75rem 1.5rem; margin-top: 1rem; }
+.timeline-sources { margin-top: 1rem; }
+.timeline-sources summary { cursor: pointer; font-weight: 600; }
+.timeline-source-list { padding-left: 1.2rem; margin-bottom: 0; overflow-wrap: anywhere; }
+.timeline-source-list li + li { margin-top: .5rem; }

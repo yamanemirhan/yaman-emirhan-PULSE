@@ -24,3 +24,10 @@ All three roles can create questions, vote, revise their own vote and read curre
 results. Only Administrator can run chain verification or inspect technical
 stored-result replays; this is enforced in the services as well as the UI. No role
 may overwrite or delete recorded history through the application.
+
+## Timeline
+
+Timeline reads create no PresentedResults. It refreshes after this page's actions
+or manually for other sessions. The prototype replays one question's full history
+and initially renders 20 entries; large histories need incremental projections
+and server-side pagination.
