@@ -17,3 +17,10 @@ Identity comes from a protected browser cookie, not a verified person. Refreshin
 the page keeps the identity, but clearing cookies or using another browser or
 device can create another participant. This discourages straightforward repeat
 voting; it does not guarantee one human, one vote.
+
+## Roles and the local demo
+
+All three roles can create questions, vote, revise their own vote and read current
+results. Only Administrator can run chain verification or inspect technical
+stored-result replays; this is enforced in the services as well as the UI. No role
+may overwrite or delete recorded history through the application.

@@ -1,13 +1,16 @@
 using Microsoft.EntityFrameworkCore;
 using Pulse.Web.Data;
 using Pulse.Web.Domain;
+using Pulse.Web.Identity;
+using System.Security.Claims;
 
 namespace Pulse.Web.Services
 {
     public sealed class EventChainVerifier(IDbContextFactory<PulseDbContext> dbFactory)
     {
-        public async Task<EventChainVerification> VerifyAsync(CancellationToken cancellationToken = default)
+        public async Task<EventChainVerification> VerifyAsync(ClaimsPrincipal user, CancellationToken cancellationToken = default)
         {
+            RolePermissions.RequireAdministrator(user);
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
 
             var previousHash = EventHasher.GenesisHash;

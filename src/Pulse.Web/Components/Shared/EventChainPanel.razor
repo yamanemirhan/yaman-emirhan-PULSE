@@ -1,8 +1,12 @@
 @using Pulse.Web.Domain
 @using Pulse.Web.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject EventChainVerifier Verifier
 @inject ILogger<EventChainPanel> Logger
 
+<AuthorizeView Roles="Administrator">
+<Authorized>
 <details class="history-panel">
     <summary class="history-heading">
         <span><span class="eyebrow">Behind the history</span><span class="history-title">Event chain integrity</span></span>
@@ -55,6 +59,8 @@
         </p>
     </div>
 </details>
+</Authorized>
+</AuthorizeView>
 
 @code {
     private EventChainVerification? _verification;
@@ -72,7 +78,12 @@
 
         try
         {
-            _verification = await Verifier.VerifyAsync();
+            var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            _verification = await Verifier.VerifyAsync(state.User);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            _error = "Administrator access is required.";
         }
         catch (Exception ex)
         {

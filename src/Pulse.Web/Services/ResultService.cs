@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using Pulse.Web.Data;
 using Pulse.Web.Domain;
 using System.Text.Json;
+using System.Security.Claims;
+using Pulse.Web.Identity;
 
 namespace Pulse.Web.Services
 {
@@ -95,8 +97,9 @@ namespace Pulse.Web.Services
             return snapshot;
         }
 
-        public async Task<IReadOnlyList<ResultComparison>> CompareStoredAsync(Guid questionId)
+        public async Task<IReadOnlyList<ResultComparison>> CompareStoredAsync(ClaimsPrincipal user, Guid questionId)
         {
+            RolePermissions.RequireAdministrator(user);
             await using var db = await dbFactory.CreateDbContextAsync();
 
             // Retrieve all stored results for the question, ordered by sequence number

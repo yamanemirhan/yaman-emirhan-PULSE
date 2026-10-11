@@ -1,0 +1,36 @@
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using Pulse.Web.Domain
+@using Pulse.Web.Identity
+@inject DemoRoleSwitching DemoRoles
+@inject NavigationManager Navigation
+
+<AuthorizeView Context="auth">
+    <Authorized>
+        <aside class="role-bar" aria-label="Current role">
+            <div>
+                <span class="eyebrow">@(DemoRoles.Enabled ? "Demo role" : "Current role")</span>
+                <strong>@auth.User.FindFirstValue(ClaimTypes.Role)</strong>
+                @if (DemoRoles.Enabled)
+                {
+                    <p>Local demo only. Switching keeps your identity and votes.</p>
+                }
+            </div>
+            @if (DemoRoles.Enabled)
+            {
+                <form method="post" action="/demo/role" data-enhance="false" class="role-form">
+                    <AntiforgeryToken />
+                    <input type="hidden" name="returnUrl" value="@(new Uri(Navigation.Uri).PathAndQuery)" />
+                    <label class="sr-only" for="demo-role">Demo role</label>
+                    <select id="demo-role" name="role">
+                        @foreach (var role in Enum.GetValues<PulseRole>())
+                        {
+                            <option value="@role" selected="@(auth.User.IsInRole(role.ToString()))">@role</option>
+                        }
+                    </select>
+                    <button class="button button-small button-outline" type="submit">Switch role</button>
+                </form>
+            }
+        </aside>
+    </Authorized>
+</AuthorizeView>

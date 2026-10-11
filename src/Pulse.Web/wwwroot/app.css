@@ -224,3 +224,16 @@ pre { margin: 0; padding: 16px; border-radius: 8px; background: #f2f4ed; color: 
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition: none !important; }
 }
+
+.role-bar { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.role-bar .eyebrow { margin-bottom: 3px; }
+.role-bar strong { font-size: .85rem; }
+.role-bar p { margin: 3px 0 0; font-size: .73rem; color: var(--muted); }
+.role-form { display: flex; align-items: center; gap: 10px; }
+.role-form select { min-width: 0; max-width: 100%; min-height: 40px; padding: .5rem .7rem; border: 1px solid #bbc9bc; border-radius: 9px; color: var(--ink); background: var(--surface); font-size: .8rem; }
+@media (max-width: 760px) {
+    .role-bar { align-items: flex-start; flex-direction: column; }
+    .role-form { width: 100%; }
+    .role-form select { flex: 1; }
+    .site-header { flex-wrap: wrap; padding: 16px 0; gap: 12px; }
+}

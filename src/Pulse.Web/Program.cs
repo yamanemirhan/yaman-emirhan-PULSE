@@ -3,8 +3,13 @@ using Pulse.Web.Components;
 using Pulse.Web.Data;
 using Pulse.Web.Identity;
 using Pulse.Web.Services;
+using Pulse.Web.Domain;
+using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
+var demoRoles = new DemoRoleSwitching(builder.Environment.IsDevelopment() &&
+    builder.Configuration.GetValue<bool>("Demo:EnableRoleSwitching"));
+builder.Services.AddSingleton(demoRoles);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
@@ -35,6 +40,21 @@ builder.Services
 
         options.ExpireTimeSpan = TimeSpan.FromDays(180);
         options.SlidingExpiration = false;
+        options.Events.OnValidatePrincipal = context =>
+        {
+            // A development demo cookie must not grant privileges after demo mode is disabled.
+            if (!demoRoles.Enabled && context.Principal?.HasClaim(DemoRoleSwitching.DemoClaim, "true") == true)
+            {
+                var actorId = context.Principal.FindFirstValue(ClaimTypes.NameIdentifier);
+                context.ReplacePrincipal(new ClaimsPrincipal(new ClaimsIdentity(new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, actorId ?? string.Empty),
+                    new Claim(ClaimTypes.Role, nameof(PulseRole.Participant))
+                }, ParticipantIdentityMiddleware.Scheme)));
+                context.ShouldRenew = true;
+            }
+            return Task.CompletedTask;
+        };
     });
 
 builder.Services.AddAuthorization();
@@ -61,6 +81,9 @@ app.UseAuthentication();
 app.UseMiddleware<ParticipantIdentityMiddleware>();
 app.UseAuthorization();
 app.UseAntiforgery();
+
+if (demoRoles.Enabled)
+    app.MapPost("/demo/role", DemoRoleSwitching.SwitchAsync);
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()

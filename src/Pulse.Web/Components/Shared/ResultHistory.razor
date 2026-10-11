@@ -1,9 +1,13 @@
 @using System.Text.Json
 @using Pulse.Web.Domain
 @using Pulse.Web.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ResultService Results
 @inject ILogger<ResultHistory> Logger
 
+<AuthorizeView Roles="Administrator">
+<Authorized>
 <details class="history-panel">
     <summary class="history-heading"><span><span class="eyebrow">Behind the result</span><span class="history-title">Stored results &amp; replay</span></span><span class="details-chevron" aria-hidden="true">+</span></summary>
     <div class="history-body">
@@ -53,6 +57,8 @@
     }
     </div>
 </details>
+</Authorized>
+</AuthorizeView>
 
 @code {
     [Parameter, EditorRequired]
@@ -76,7 +82,12 @@
 
         try
         {
-            _comparisons = await Results.CompareStoredAsync(QuestionId);
+            var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            _comparisons = await Results.CompareStoredAsync(state.User, QuestionId);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            _error = "Administrator access is required.";
         }
         catch (NotSupportedException ex)
         {

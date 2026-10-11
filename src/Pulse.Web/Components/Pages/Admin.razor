@@ -1,0 +1,21 @@
+@page "/admin"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components.Authorization
+@using Pulse.Web.Components.Shared
+
+<PageTitle>Administration · PULSE</PageTitle>
+<AuthorizeView Roles="Administrator">
+    <Authorized>
+        <p class="eyebrow">Administration</p>
+        <h1>Record integrity</h1>
+        <p class="muted">Inspect the global event chain. To compare stored results with a replay, open a question.</p>
+        <EventChainPanel />
+    </Authorized>
+    <NotAuthorized>
+        <section class="card empty-state">
+            <h1>Administrator access required</h1>
+            <p class="muted">Your current role cannot access these tools.</p>
+            <a class="button button-outline" href="/">Back to questions</a>
+        </section>
+    </NotAuthorized>
+</AuthorizeView>

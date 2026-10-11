@@ -1,4 +1,6 @@
 @inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Authorization
+@using Pulse.Web.Components.Shared
 
 <a class="skip-link" href="#main-content">Skip to content</a>
 <div class="app-shell">
@@ -8,8 +10,12 @@
             <span>PULSE</span>
         </a>
         <span class="header-note">A little clarity, together.</span>
+        <AuthorizeView Roles="Administrator">
+            <Authorized><a class="button button-small button-outline" href="/admin">Administration</a></Authorized>
+        </AuthorizeView>
         <a class="button button-small button-outline" href="/">Ask a question <span aria-hidden="true">↗</span></a>
     </header>
+    <RoleSwitcher />
     <main id="main-content" class="main-content">@Body</main>
     <footer class="site-footer"><span>PULSE</span><span>Good questions leave room for a change of mind.</span></footer>
 </div>
