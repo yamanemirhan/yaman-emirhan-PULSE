@@ -39,3 +39,10 @@ question or its event boundary changes. This is near-live, not simultaneous acro
 clients. Voting and evidence remain on the question page. Polling is intentionally 
 simple for the prototype. It adds one state query per viewer every two seconds; 
 high traffic needs shared projections, caching and push updates.
+
+## AI assistance and testing
+
+AI coding assistance was used during implementation and to write focused automated
+tests. The tests cover calculation, history, retries, concurrent writes and role
+boundaries using real SQLite databases. They are not a load test or a complete
+security audit. Run them with `dotnet test Pulse.slnx`; see `tests/README.md`.

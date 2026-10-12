@@ -2,4 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Pulse.Web/Pulse.Web.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Pulse.Web.Tests/Pulse.Web.Tests.csproj" />
+  </Folder>
 </Solution>
